@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Safety Dashboard — PT CPI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root {
+    width: 100%; height: 100%;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #0B1220;
+    overflow: hidden;
+  }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  .ti { line-height: 1; }
+  .screen-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  @media (min-width: 430px) {
+    body { display: flex; align-items: center; justify-content: center; }
+    #root {
+      width: 390px; height: 844px;
+      border-radius: 44px;
+      overflow: hidden;
+      box-shadow: 0 32px 80px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.08);
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, useRef, useEffect } = React;
+const h = React.createElement;
+
+// ─── Color tokens ───────────────────────────────────────────────
+const C = {
+  ink:     '#0F172A',
+  bg:      '#F1F5F9',
+  line:    '#E2E8F0',
+  teal:    '#3b82f6',
+  sec:     '#475569',
+  mut:     '#94A3B8',
+  danger:  '#DC2626',
+  warn:    '#D97706',
+  ok:      '#16A34A',
+  info:    '#2563EB',
+  red100:  '#FEE2E2',
+  amber100:'#FEF3C7',
+  green100:'#DCFCE7',
+  blue100: '#DBEAFE',
+};
+
+// ─── Shared primitives ─────────────────────────────────────────
+function Card({ children, style }) {
+  return h('div', {
+    style: {
+      background: '#fff', borderRadius: 16,
+      border: `1px solid ${C.line}`,
+      boxShadow: '0 1px 2px rgba(15,23,42,.04)',
+      ...style
+    }
+  }, children);
+}
+
+function KpiCard({ icon, label, value, trend, accent, tint }) {
+  const [trendVal, trendColor, trendBg, trendIcon] = trend || [];
+  return h(Card, { style: { padding: '13px 14px' } },
+    h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 } },
+      h('div', { style: { width: 34, height: 34, borderRadius: 10, background: tint, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+        h('i', { className: `ti ti-${icon}`, style: { fontSize: 19, color: accent } })
+      ),
+      trendVal && h('div', {
+        style: {
+          display: 'inline-flex', alignItems: 'center', gap: 2,
+          fontSize: 11, fontWeight: 700, color: trendColor,
+          background: trendBg, padding: '3px 6px', borderRadius: 6
+        }
+      },
+        h('i', { className: `ti ti-${trendIcon}`, style: { fontSize: 11 } }),
+        trendVal
+      )
+    ),
+    h('div', { style: { fontSize: 22, fontWeight: 800, color: C.ink, letterSpacing: -0.5 } }, value),
+    h('div', { style: { fontSize: 11.5, color: C.mut, marginTop: 3, fontWeight: 600 } }, label)
+  );
+}
+
+function TrafficDot({ color }) {
+  return h('div', {
+    style: {
+      width: 10, height: 10, borderRadius: '50%', background: color,
+      boxShadow: `0 0 0 3px ${color}22`, flexShrink: 0
+    }
+  });
+}
+
+function RoleBadge({ level, label }) {
+  const colors = ['#94A3B8','#6366f1','#3b82f6','#0ea5e9','#16A34A','#D97706'];
+  const c = colors[Math.min(level, colors.length - 1)];
+  return h('div', {
+    style: {
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: 'rgba(255,255,255,.15)', borderRadius: 8,
+      padding: '5px 10px', fontSize: 11, fontWeight: 700, color: '#fff'
+    }
+  },
+    h('div', { style: { width: 6, height: 6, borderRadius: '50%', background: c } }),
+    `L${level} · ${label}`
+  );
+}
+
+function ScopeChip({ parts, active }) {
+  const [first, ...rest] = parts;
+  return h('div', {
+    style: {
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: active ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.1)',
+      borderRadius: 99, padding: '5px 12px 5px 8px',
+      border: '1px solid rgba(255,255,255,.2)', cursor: 'pointer'
+    }
+  },
+    h('div', { style: { width: 20, height: 20, borderRadius: 6, background: 'rgba(255,255,255,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+      h('i', { className: 'ti ti-building-factory-2', style: { fontSize: 12, color: '#fff' } })
+    ),
+    h('div', { style: { fontSize: 11.5, fontWeight: 700, color: '#fff' } },
+      first,
+      rest.length > 0 && h('span', { style: { opacity: 0.75, fontWeight: 500 } }, ` · ${rest.join(' · ')}`)
+    )
+  );
+}
+
+function AppHeader({ gradient, children }) {
+  return h('div', {
+    style: {
+      background: gradient || `linear-gradient(135deg,${C.teal},${C.info})`,
+      padding: '52px 16px 16px',
+      flexShrink: 0
+    }
+  }, children);
+}
+
+function StatusBar() {
+  const now = new Date();
+  const t = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return h('div', {
+    style: {
+      position: 'absolute', top: 0, left: 0, right: 0,
+      height: 44, display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', padding: '0 20px',
+      zIndex: 50
+    }
+  },
+    h('div', { style: { fontSize: 13, fontWeight: 800, color: '#fff' } }, t),
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+      h('i', { className: 'ti ti-wifi', style: { fontSize: 14, color: '#fff' } }),
+      h('i', { className: 'ti ti-signal-4g', style: { fontSize: 14, color: '#fff' } }),
+      h('i', { className: 'ti ti-battery-3', style: { fontSize: 16, color: '#fff' } })
+    )
+  );
+}
+
+function BottomNav({ active, onPress }) {
+  const items = [
+    { label: 'Home', icon: 'home-2' },
+    { label: 'Laporan', icon: 'report' },
+    { label: 'HSE', icon: 'shield-half-filled' },
+    { label: 'More', icon: 'dots' },
+  ];
+  return h('div', {
+    style: {
+      position: 'absolute', left: 0, right: 0, bottom: 0,
+      background: '#fff', borderTop: `1px solid ${C.line}`,
+      paddingTop: 8, zIndex: 30,
+      boxShadow: '0 -4px 16px rgba(15,23,42,.05)'
+    }
+  },
+    h('div', { style: { display: 'flex', justifyContent: 'space-around', padding: '0 4px' } },
+      items.map((it, i) => {
+        const on = i === active;
+        return h('div', {
+          key: i, onClick: () => onPress(i),
+          style: {
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 3, flex: 1, cursor: 'pointer', padding: '2px 0', userSelect: 'none'
+          }
+        },
+          h('i', { className: `ti ti-${it.icon}`, style: { fontSize: 22, color: on ? C.teal : '#94A3B8' } }),
+          h('div', { style: { fontSize: 10, fontWeight: on ? 700 : 600, color: on ? C.teal : '#94A3B8' } }, it.label)
+        );
+      })
+    ),
+    h('div', {
+      style: {
+        display: 'flex', justifyContent: 'center', padding: '8px 0 6px'
+      }
+    },
+      h('div', { style: { width: 134, height: 5, borderRadius: 99, background: '#0F172A' } })
+    )
+  );
+}
+
+function Fab({ onClick }) {
+  return h('div', {
+    onClick,
+    style: {
+      position: 'absolute', right: 18, bottom: 104,
+      width: 58, height: 58, borderRadius: 18,
+      background: 'linear-gradient(150deg,#60a5fa,#3b82f6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 10px 24px rgba(59,130,246,.5)', zIndex: 25, cursor: 'pointer'
+    }
+  },
+    h('i', { className: 'ti ti-plus', style: { fontSize: 28, color: '#fff' } })
+  );
+}
+
+function Chip({ label, active, onClick }) {
+  return h('div', {
+    onClick,
+    style: {
+      padding: '7px 14px', borderRadius: 99, fontSize: 12.5, fontWeight: 600,
+      background: active ? C.teal : '#F1F5F9',
+      color: active ? '#fff' : C.sec,
+      border: active ? `1px solid ${C.teal}` : `1px solid ${C.line}`,
+      cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none'
+    }
+  }, label);
+}
+
+function PageHeader({ title, subtitle, rightIcon, onBack, onRight }) {
+  return h('div', {
+    style: {
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '14px 16px', background: '#fff',
+      borderBottom: `1px solid ${C.line}`, flexShrink: 0
+    }
+  },
+    onBack && h('div', {
+      onClick: onBack,
+      style: { width: 36, height: 36, borderRadius: 10, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+    },
+      h('i', { className: 'ti ti-arrow-left', style: { fontSize: 20, color: C.ink } })
+    ),
+    h('div', { style: { flex: 1 } },
+      h('div', { style: { fontSize: 16, fontWeight: 800, color: C.ink } }, title),
+      subtitle && h('div', { style: { fontSize: 11.5, color: C.mut, marginTop: 1 } }, subtitle)
+    ),
+    rightIcon && h('div', {
+      onClick: onRight,
+      style: { width: 36, height: 36, borderRadius: 10, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+    },
+      h('i', { className: `ti ti-${rightIcon}`, style: { fontSize: 20, color: C.ink } })
+    )
+  );
+}
+
+function StatusBadge({ label, color, bg }) {
+  return h('div', {
+    style: {
+      padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+      color: color || '#fff', background: bg || C.teal
+    }
+  }, label);
+}
+
+// ─── Screen: Dashboard (Home) ──────────────────────────────────
+function ScreenDashboard({ onNavigate }) {
+  const feedItems = [
+    { icon: 'alert-triangle', iconC: C.danger, iconBg: C.red100, title: 'Insiden baru dilaporkan di Plant Cikande — Terjepit mesin produksi', meta: '2 jam lalu · Plant Cikande · Food Processing', badge: h(StatusBadge, { label: 'Baru', color: '#fff', bg: C.danger }) },
+    { icon: 'clipboard-check', iconC: C.ok, iconBg: C.green100, title: 'Inspeksi APAR Bulanan selesai — 92% passed, 1 temuan kritis', meta: '5 jam lalu · Plant Medan · Feedmill', badge: h(StatusBadge, { label: 'Selesai', color: C.ok, bg: C.green100 }) },
+    { icon: 'file-certificate', iconC: C.warn, iconBg: C.amber100, title: 'PTW-2026-0231 Hot Work membutuhkan persetujuan Anda', meta: '6 jam lalu · Plant Surabaya · Feedmill', badge: h(StatusBadge, { label: 'Perlu Tindak', color: C.warn, bg: C.amber100 }) },
+    { icon: 'book-2', iconC: C.info, iconBg: C.blue100, title: 'Materi baru: Penanganan B3 — Asam Sulfat Level II', meta: 'Kemarin · HSE Center · 47 tayangan' },
+    { icon: 'message-circle', iconC: '#8b5cf6', iconBg: '#ede9fe', title: 'Budi Santoso menambahkan komentar pada INC-2026-0142', meta: 'Kemarin · Incident Report' },
+  ];
+
+  const plantList = [
+    { name: 'Plant Medan', bu: 'Feedmill', color: C.ok, label: 'AMAN' },
+    { name: 'Plant Surabaya', bu: 'Feedmill', color: C.warn, label: 'WASPADA' },
+    { name: 'Plant Cikande', bu: 'Food Processing', color: C.danger, label: 'BAHAYA' },
+  ];
+
+  return h('div', { style: { position: 'relative', height: '100%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+    // Status bar
+    h(StatusBar),
+    // Header
+    h(AppHeader, { gradient: 'linear-gradient(135deg,#3b82f6,#2563eb)' },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 11 } },
+        h('div', {
+          style: {
+            width: 42, height: 42, borderRadius: 13,
+            background: 'rgba(255,255,255,.18)', border: '1px solid rgba(255,255,255,.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 800, fontSize: 15, color: '#fff'
+          }
+        }, 'BS'),
+        h('div', { style: { flex: 1 } },
+          h('div', { style: { fontSize: 12, color: 'rgba(255,255,255,.8)' } }, 'Selamat pagi,'),
+          h('div', { style: { fontSize: 16, fontWeight: 800, color: '#fff' } }, 'Budi Santoso')
+        ),
+        h('div', {
+          style: {
+            position: 'relative', width: 40, height: 40, borderRadius: 12,
+            background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+          }
+        },
+          h('i', { className: 'ti ti-bell', style: { fontSize: 21, color: '#fff' } }),
+          h('div', {
+            style: {
+              position: 'absolute', top: 7, right: 8, width: 16, height: 16,
+              borderRadius: 99, background: C.danger, border: '2px solid #3b82f6',
+              fontSize: 9, fontWeight: 800, color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }
+          }, '4')
+        )
+      ),
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 13 } },
+        h(ScopeChip, { parts: ['Feedmill', 'Plant Medan', 'Produksi'], active: true }),
+        h('i', { className: 'ti ti-selector', style: { fontSize: 16, color: 'rgba(255,255,255,.8)' } }),
+        h('div', { style: { marginLeft: 'auto' } }, h(RoleBadge, { level: 5, label: 'Supervisor' }))
+      )
+    ),
+    // Scrollable body
+    h('div', { className: 'screen-scroll', style: { flex: 1, padding: '14px 16px 110px', display: 'flex', flexDirection: 'column', gap: 14 } },
+      // KPI grid
+      h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 } },
+        h(KpiCard, { icon: 'alert-triangle', label: 'Insiden Bulan Ini', value: '3', trend: ['-57%', '#15803D', C.green100, 'arrow-down-right'], accent: C.danger, tint: C.red100 }),
+        h(KpiCard, { icon: 'file-certificate', label: 'Permit Terbuka', value: '7', trend: ['+2', '#B45309', C.amber100, 'arrow-up-right'], accent: C.warn, tint: C.amber100 }),
+        h(KpiCard, { icon: 'clipboard-check', label: 'Skor Inspeksi', value: '92%', trend: ['+4%', '#15803D', C.green100, 'arrow-up-right'], accent: C.ok, tint: C.green100 }),
+        h(KpiCard, { icon: 'eye-exclamation', label: 'Unsafe Act', value: '5', trend: ['+1', '#B91C1C', C.red100, 'arrow-up-right'], accent: C.info, tint: C.blue100 })
+      ),
+      // Plant status
+      h(Card, { style: { padding: '14px 16px' } },
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 } },
+          h('div', { style: { fontSize: 13.5, fontWeight: 800, color: C.ink } }, 'Status Keselamatan Plant'),
+          h('div', { style: { fontSize: 11, fontWeight: 700, color: C.teal, cursor: 'pointer' } }, 'Lihat semua')
+        ),
+        plantList.map(p =>
+          h('div', { key: p.name, style: { display: 'flex', alignItems: 'center', gap: 11, padding: '10px 0', borderBottom: `1px solid ${C.line}` } },
+            h(TrafficDot, { color: p.color }),
+            h('div', { style: { flex: 1 } },
+              h('div', { style: { fontSize: 12.8, fontWeight: 700, color: C.ink } }, p.name),
+              h('div', { style: { fontSize: 11, color: C.mut } }, p.bu)
+            ),
+            h('div', { style: { fontSize: 11, fontWeight: 700, color: p.color } }, p.label)
+          )
+        )
+      ),
+      // Quick actions
+      h(Card, { style: { padding: '14px 16px' } },
+        h('div', { style: { fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: 12 } }, 'Aksi Cepat'),
+        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 } },
+          [
+            { icon: 'alert-triangle', label: 'Lapor Insiden', color: C.danger, bg: C.red100 },
+            { icon: 'clipboard-check', label: 'Mulai Inspeksi', color: C.ok, bg: C.green100 },
+            { icon: 'file-certificate', label: 'Buat Permit', color: C.warn, bg: C.amber100 },
+            { icon: 'camera-plus', label: 'Foto Bahaya', color: C.info, bg: C.blue100 },
+          ].map(a =>
+            h('div', {
+              key: a.label,
+              style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer' }
+            },
+              h('div', {
+                style: {
+                  width: 52, height: 52, borderRadius: 14,
+                  background: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }
+              },
+                h('i', { className: `ti ti-${a.icon}`, style: { fontSize: 24, color: a.color } })
+              ),
+              h('div', { style: { fontSize: 10.5, fontWeight: 600, color: C.sec, textAlign: 'center', lineHeight: 1.3 } }, a.label)
+            )
+          )
+        )
+      ),
+      // Activity feed
+      h(Card, { style: { padding: '14px 16px' } },
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 } },
+          h('div', { style: { fontSize: 13.5, fontWeight: 800, color: C.ink } }, 'Aktivitas Terkini'),
+          h('div', { style: { fontSize: 11, fontWeight: 700, color: C.teal, cursor: 'pointer' } }, 'Semua')
+        ),
+        feedItems.map((f, i) =>
+          h('div', {
+            key: i,
+            style: {
+              display: 'flex', gap: 11, alignItems: 'flex-start',
+              padding: '11px 0',
+              borderBottom: i < feedItems.length - 1 ? `1px solid ${C.line}` : 'none'
+            }
+          },
+            h('div', {
+              style: {
+                width: 34, height: 34, borderRadius: 10, background: f.iconBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }
+            },
+              h('i', { className: `ti ti-${f.icon}`, style: { fontSize: 18, color: f.iconC } })
+            ),
+            h('div', { style: { flex: 1, minWidth: 0 } },
+              h('div', { style: { fontSize: 12.8, fontWeight: 600, color: C.ink, lineHeight: 1.35 } }, f.title),
+              h('div', { style: { fontSize: 11, color: C.mut, marginTop: 3 } }, f.meta)
+            ),
+            f.badge
+          )
+        )
+      )
+    ),
+    h(Fab, { onClick: () => {} }),
+    h(BottomNav, { active: 0, onPress: onNavigate })
+  );
+}
+
+// ─── Screen: Laporan ──────────────────────────────────────────
+function ScreenLaporan({ onNavigate }) {
+  const [tab, setTab] = useState(0);
+  const tabs = ['Insiden', 'Inspeksi', 'Permit'];
+
+  const incidents = [
+    { id: 'INC-2026-0142', title: 'Terjepit mesin conveyor belt', loc: 'Plant Cikande · Food Processing', date: '24 Jun 2026', severity: 'SEDANG', sevColor: C.warn, sevBg: C.amber100, status: 'Investigasi', statColor: '#7c3aed', statBg: '#ede9fe' },
+    { id: 'INC-2026-0141', title: 'Terpeleset di area wet floor', loc: 'Plant Medan · Feedmill', date: '22 Jun 2026', severity: 'RINGAN', sevColor: C.ok, sevBg: C.green100, status: 'Selesai', statColor: C.ok, statBg: C.green100 },
+    { id: 'INC-2026-0140', title: 'Percikan api pada panel listrik', loc: 'Plant Surabaya · Feedmill', date: '20 Jun 2026', severity: 'BERAT', sevColor: C.danger, sevBg: C.red100, status: 'Verifikasi', statColor: C.info, statBg: C.blue100 },
+    { id: 'INC-2026-0139', title: 'Paparan debu berlebih di area mixing', loc: 'Plant Balaraja · Feedmill', date: '19 Jun 2026', severity: 'RINGAN', sevColor: C.ok, sevBg: C.green100, status: 'Selesai', statColor: C.ok, statBg: C.green100 },
+    { id: 'INC-2026-0138', title: 'Near miss: Forklift hampir menabrak pejalan kaki', loc: 'Plant Cikande · Food Processing', date: '17 Jun 2026', severity: 'SEDANG', sevColor: C.warn, sevBg: C.amber100, status: 'Selesai', statColor: C.ok, statBg: C.green100 },
+  ];
+
+  const inspections = [
+    { id: 'INS-2026-0089', title: 'Inspeksi APAR Bulanan', loc: 'Plant Medan · Feedmill', date: '24 Jun 2026', score: 92, status: 'Selesai', statColor: C.ok, statBg: C.green100 },
+    { id: 'INS-2026-0088', title: 'Housekeeping Mingguan', loc: 'Plant Surabaya · Feedmill', date: '23 Jun 2026', score: 87, status: 'Selesai', statColor: C.ok, statBg: C.green100 },
+    { id: 'INS-2026-0087', title: 'Inspeksi APD Karyawan', loc: 'Plant Cikande · FP', date: '23 Jun 2026', score: null, status: 'Berlangsung', statColor: C.info, statBg: C.blue100 },
+    { id: 'INS-2026-0086', title: 'Inspeksi Scaffolding Area Konstruksi', loc: 'Plant Balaraja · FP', date: '22 Jun 2026', score: 78, status: 'Selesai', statColor: C.ok, statBg: C.green100 },
+    { id: 'INS-2026-0085', title: 'Inspeksi Forklift Bulanan', loc: 'Plant Medan · FM', date: '21 Jun 2026', score: null, status: 'Terjadwal', statColor: C.mut, statBg: '#F1F5F9' },
+  ];
+
+  const permits = [
+    { id: 'PTW-2026-0231', title: 'Hot Work — Pengelasan Pipa Steam', loc: 'Plant Surabaya · Produksi', date: '24 Jun 2026', type: 'Hot Work', typeColor: C.danger, typeBg: C.red100, status: 'Menunggu Approval', statColor: C.warn, statBg: C.amber100 },
+    { id: 'PTW-2026-0230', title: 'Confined Space Entry — Tangki Molase', loc: 'Plant Medan · Penyimpanan', date: '24 Jun 2026', type: 'Confined Space', typeColor: '#7c3aed', typeBg: '#ede9fe', status: 'Disetujui', statColor: C.ok, statBg: C.green100 },
+    { id: 'PTW-2026-0229', title: 'Work at Height — Pemasangan Panel Surya', loc: 'Plant Cikande · Atap', date: '23 Jun 2026', type: 'Height Work', typeColor: C.info, typeBg: C.blue100, status: 'Aktif', statColor: C.ok, statBg: C.green100 },
+    { id: 'PTW-2026-0228', title: 'Electrical — Penggantian MCC Panel', loc: 'Plant Balaraja · Electrical', date: '22 Jun 2026', type: 'Electrical', typeColor: C.warn, typeBg: C.amber100, status: 'Selesai', statColor: C.mut, statBg: '#F1F5F9' },
+    { id: 'PTW-2026-0227', title: 'Chemical Handling — Transfer Asam Klorida', loc: 'Plant Surabaya · Lab', date: '21 Jun 2026', type: 'Chemical', typeColor: '#0891b2', typeBg: '#cffafe', status: 'Selesai', statColor: C.mut, statBg: '#F1F5F9' },
+  ];
+
+  const incidentSeverityIcon = { 'RINGAN': 'info-circle', 'SEDANG': 'alert-triangle', 'BERAT': 'alert-octagon' };
+
+  return h('div', { style: { position: 'relative', height: '100%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+    h(StatusBar),
+    // Header
+    h('div', {
+      style: {
+        background: 'linear-gradient(135deg,#2563EB,#1e40af)',
+        padding: '52px 16px 16px', flexShrink: 0
+      }
+    },
+      h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+        h('div', null,
+          h('div', { style: { fontSize: 12, color: 'rgba(255,255,255,.75)', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase' } }, 'Hub Pelaporan'),
+          h('div', { style: { fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: -0.5, marginTop: 2 } }, 'Laporan')
+        ),
+        h('div', { style: { display: 'flex', gap: 8 } },
+          h('div', {
+            style: {
+              width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+            }
+          }, h('i', { className: 'ti ti-adjustments-horizontal', style: { fontSize: 20, color: '#fff' } })),
+          h('div', {
+            style: {
+              width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+            }
+          }, h('i', { className: 'ti ti-search', style: { fontSize: 20, color: '#fff' } }))
+        )
+      )
+    ),
+    // Tabs
+    h('div', {
+      style: {
+        display: 'flex', gap: 8, padding: '12px 16px',
+        background: '#fff', borderBottom: `1px solid ${C.line}`,
+        overflowX: 'auto', flexShrink: 0
+      }
+    },
+      tabs.map((t, i) => h(Chip, { key: t, label: t, active: tab === i, onClick: () => setTab(i) }))
+    ),
+    // List
+    h('div', { className: 'screen-scroll', style: { flex: 1, padding: '12px 16px 110px', display: 'flex', flexDirection: 'column', gap: 10 } },
+      tab === 0 && incidents.map(inc =>
+        h(Card, { key: inc.id, style: { padding: '14px 15px', cursor: 'pointer' } },
+          h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: 11 } },
+            h('div', {
+              style: {
+                width: 40, height: 40, borderRadius: 12, background: inc.sevBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }
+            },
+              h('i', { className: `ti ti-${incidentSeverityIcon[inc.severity] || 'alert-triangle'}`, style: { fontSize: 20, color: inc.sevColor } })
+            ),
+            h('div', { style: { flex: 1, minWidth: 0 } },
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 } },
+                h('div', { style: { fontSize: 11, fontWeight: 700, color: C.mut } }, inc.id),
+                h(StatusBadge, { label: inc.severity, color: inc.sevColor, bg: inc.sevBg })
+              ),
+              h('div', { style: { fontSize: 13.5, fontWeight: 700, color: C.ink, lineHeight: 1.35, marginBottom: 5 } }, inc.title),
+              h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                h('div', { style: { fontSize: 11, color: C.mut } }, `${inc.loc} · ${inc.date}`),
+                h(StatusBadge, { label: inc.status, color: inc.statColor, bg: inc.statBg })
+              )
+            )
+          )
+        )
+      ),
+      tab === 1 && inspections.map(ins =>
+        h(Card, { key: ins.id, style: { padding: '14px 15px', cursor: 'pointer' } },
+          h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: 11 } },
+            h('div', {
+              style: {
+                width: 40, height: 40, borderRadius: 12, background: C.green100,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }
+            },
+              h('i', { className: 'ti ti-clipboard-check', style: { fontSize: 20, color: C.ok } })
+            ),
+            h('div', { style: { flex: 1, minWidth: 0 } },
+              h('div', { style: { fontSize: 11, fontWeight: 700, color: C.mut, marginBottom: 3 } }, ins.id),
+              h('div', { style: { fontSize: 13.5, fontWeight: 700, color: C.ink, lineHeight: 1.35, marginBottom: 5 } }, ins.title),
+              h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                h('div', { style: { fontSize: 11, color: C.mut } }, `${ins.loc} · ${ins.date}`),
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                  ins.score != null && h('div', { style: { fontSize: 12, fontWeight: 800, color: ins.score >= 90 ? C.ok : ins.score >= 75 ? C.warn : C.danger } }, `${ins.score}%`),
+                  h(StatusBadge, { label: ins.status, color: ins.statColor, bg: ins.statBg })
+                )
+              )
+            )
+          )
+        )
+      ),
+      tab === 2 && permits.map(ptw =>
+        h(Card, { key: ptw.id, style: { padding: '14px 15px', cursor: 'pointer' } },
+          h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: 11 } },
+            h('div', {
+              style: {
+                width: 40, height: 40, borderRadius: 12, background: ptw.typeBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }
+            },
+              h('i', { className: 'ti ti-file-certificate', style: { fontSize: 20, color: ptw.typeColor } })
+            ),
+            h('div', { style: { flex: 1, minWidth: 0 } },
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 } },
+                h('div', { style: { fontSize: 11, fontWeight: 700, color: C.mut } }, ptw.id),
+                h(StatusBadge, { label: ptw.type, color: ptw.typeColor, bg: ptw.typeBg })
+              ),
+              h('div', { style: { fontSize: 13.5, fontWeight: 700, color: C.ink, lineHeight: 1.35, marginBottom: 5 } }, ptw.title),
+              h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                h('div', { style: { fontSize: 11, color: C.mut } }, `${ptw.loc} · ${ptw.date}`),
+                h(StatusBadge, { label: ptw.status, color: ptw.statColor, bg: ptw.statBg })
+              )
+            )
+          )
+        )
+      )
+    ),
+    h(Fab, { onClick: () => {} }),
+    h(BottomNav, { active: 1, onPress: onNavigate })
+  );
+}
+
+// ─── Screen: HSE Knowledge ─────────────────────────────────────
+function ScreenHSE({ onNavigate }) {
+  const [tab, setTab] = useState(0);
+  const tabs = ['Semua', 'Video', 'Artikel', 'SOP', 'Regulasi'];
+
+  const articles = [
+    { icon: 'video', iconC: '#7c3aed', iconBg: '#ede9fe', tag: 'Video', tagColor: '#7c3aed', tagBg: '#ede9fe', title: 'Prosedur Lockout/Tagout (LOTO) — Panduan Lengkap', meta: 'HSE Center · 3 mnt lalu', views: '134', likes: '28', type: 'video' },
+    { icon: 'file-text', iconC: C.info, iconBg: C.blue100, tag: 'Artikel', tagColor: C.info, tagBg: C.blue100, title: 'Penanganan B3 — Asam Sulfat Level II: Prosedur Aman', meta: 'Safety Dept · 2 jam lalu', views: '47', likes: '12', type: 'article' },
+    { icon: 'clipboard-list', iconC: C.ok, iconBg: C.green100, tag: 'SOP', tagColor: C.ok, tagBg: C.green100, title: 'SOP Kerja di Ketinggian — Revisi 3.2', meta: 'Departemen HSE · 1 hari lalu', views: '89', likes: '34', type: 'sop' },
+    { icon: 'book-2', iconC: C.warn, iconBg: C.amber100, tag: 'Regulasi', tagColor: C.warn, tagBg: C.amber100, title: 'PP No. 50 Tahun 2012 — SMK3 Update 2026', meta: 'Legal HSE · 3 hari lalu', views: '201', likes: '56', type: 'regulasi' },
+    { icon: 'video', iconC: '#7c3aed', iconBg: '#ede9fe', tag: 'Video', tagColor: '#7c3aed', tagBg: '#ede9fe', title: 'Simulasi Evakuasi Darurat — Feedmill Medan 2026', meta: 'Plant Medan · 5 hari lalu', views: '312', likes: '87', type: 'video' },
+    { icon: 'file-text', iconC: C.info, iconBg: C.blue100, tag: 'Artikel', tagColor: C.info, tagBg: C.blue100, title: 'Investigasi Insiden: Root Cause Analysis Metode 5-Why', meta: 'Safety Dept · 1 minggu lalu', views: '156', likes: '42', type: 'article' },
+  ];
+
+  const typeMap = { 0: null, 1: 'video', 2: 'article', 3: 'sop', 4: 'regulasi' };
+  const filtered = tab === 0 ? articles : articles.filter(a => a.type === typeMap[tab]);
+
+  return h('div', { style: { position: 'relative', height: '100%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+    h(StatusBar),
+    h('div', {
+      style: {
+        background: 'linear-gradient(135deg,#0f766e,#0d9488)',
+        padding: '52px 16px 16px', flexShrink: 0
+      }
+    },
+      h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+        h('div', null,
+          h('div', { style: { fontSize: 12, color: 'rgba(255,255,255,.75)', fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase' } }, 'Pengetahuan'),
+          h('div', { style: { fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: -0.5, marginTop: 2 } }, 'HSE Knowledge')
+        ),
+        h('div', {
+          style: {
+            width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+          }
+        }, h('i', { className: 'ti ti-search', style: { fontSize: 20, color: '#fff' } }))
+      )
+    ),
+    // Category chips
+    h('div', {
+      style: {
+        display: 'flex', gap: 8, padding: '12px 16px',
+        background: '#fff', borderBottom: `1px solid ${C.line}`,
+        overflowX: 'auto', flexShrink: 0
+      }
+    },
+      tabs.map((t, i) => h(Chip, { key: t, label: t, active: tab === i, onClick: () => setTab(i) }))
+    ),
+    // Content
+    h('div', { className: 'screen-scroll', style: { flex: 1, padding: '12px 16px 110px', display: 'flex', flexDirection: 'column', gap: 10 } },
+      filtered.length === 0
+        ? h(Card, { style: { padding: '32px 18px', textAlign: 'center' } },
+            h('i', { className: 'ti ti-clipboard-off', style: { fontSize: 36, color: C.line, display: 'block', marginBottom: 12 } }),
+            h('div', { style: { fontSize: 14, fontWeight: 700, color: C.ink } }, 'Belum ada konten'),
+            h('div', { style: { fontSize: 12, color: C.mut, marginTop: 6 } }, 'Konten akan segera tersedia.')
+          )
+        : filtered.map((a, i) =>
+          h(Card, { key: i, style: { padding: '14px 15px', cursor: 'pointer' } },
+            h('div', { style: { display: 'flex', gap: 12, alignItems: 'flex-start' } },
+              h('div', {
+                style: {
+                  width: 48, height: 48, borderRadius: 14, background: a.iconBg,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }
+              },
+                h('i', { className: `ti ti-${a.icon}`, style: { fontSize: 24, color: a.iconC } })
+              ),
+              h('div', { style: { flex: 1, minWidth: 0 } },
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 } },
+                  h(StatusBadge, { label: a.tag, color: a.tagColor, bg: a.tagBg })
+                ),
+                h('div', { style: { fontSize: 13.5, fontWeight: 700, color: C.ink, lineHeight: 1.4, marginBottom: 6 } }, a.title),
+                h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                  h('div', { style: { fontSize: 11, color: C.mut } }, a.meta),
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                    h('div', { style: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: C.mut } },
+                      h('i', { className: 'ti ti-eye', style: { fontSize: 13 } }), a.views
+                    ),
+                    h('div', { style: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: C.mut } },
+                      h('i', { className: 'ti ti-heart', style: { fontSize: 13 } }), a.likes
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+    ),
+    h(Fab, { onClick: () => {} }),
+    h(BottomNav, { active: 2, onPress: onNavigate })
+  );
+}
+
+// ─── Screen: More / Profile ────────────────────────────────────
+function ScreenMore({ onNavigate }) {
+  const menuGroups = [
+    {
+      title: 'Akun', items: [
+        { icon: 'user-circle', label: 'Profil Saya', sub: 'Budi Santoso · L5 Supervisor', color: C.teal, bg: C.blue100 },
+        { icon: 'building-factory-2', label: 'Scope & Plant', sub: 'Plant Medan · Feedmill · Produksi', color: '#0891b2', bg: '#cffafe' },
+        { icon: 'bell', label: 'Notifikasi', sub: '4 notifikasi belum dibaca', color: C.warn, bg: C.amber100, badge: '4' },
+      ]
+    },
+    {
+      title: 'Aplikasi', items: [
+        { icon: 'clipboard-list', label: 'Referensi Data', sub: 'Kategori insiden · Jenis permit · Hazard', color: C.ok, bg: C.green100 },
+        { icon: 'users', label: 'Manajemen User', sub: 'Kelola akses & peran pengguna', color: '#7c3aed', bg: '#ede9fe' },
+        { icon: 'chart-bar', label: 'Analitik & Laporan', sub: 'Trend · statistik · export', color: C.info, bg: C.blue100 },
+      ]
+    },
+    {
+      title: 'Sistem', items: [
+        { icon: 'settings', label: 'Pengaturan', sub: 'Bahasa · tema · preferensi', color: C.sec, bg: '#F1F5F9' },
+        { icon: 'help-circle', label: 'Bantuan & FAQ', sub: 'Panduan penggunaan · kontak support', color: C.mut, bg: '#F1F5F9' },
+        { icon: 'logout', label: 'Keluar', sub: 'Logout dari akun ini', color: C.danger, bg: C.red100 },
+      ]
+    },
+  ];
+
+  return h('div', { style: { position: 'relative', height: '100%', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+    h(StatusBar),
+    h('div', {
+      style: {
+        background: 'linear-gradient(135deg,#1e293b,#0F172A)',
+        padding: '52px 16px 20px', flexShrink: 0
+      }
+    },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 14 } },
+        h('div', {
+          style: {
+            width: 56, height: 56, borderRadius: 16,
+            background: 'linear-gradient(150deg,#3b82f6,#2563eb)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, fontWeight: 800, color: '#fff'
+          }
+        }, 'BS'),
+        h('div', { style: { flex: 1 } },
+          h('div', { style: { fontSize: 18, fontWeight: 800, color: '#fff' } }, 'Budi Santoso'),
+          h('div', { style: { fontSize: 12, color: 'rgba(255,255,255,.65)', marginTop: 3 } }, 'HSE Supervisor · Plant Medan'),
+          h('div', { style: { marginTop: 8 } }, h(RoleBadge, { level: 5, label: 'Supervisor' }))
+        )
+      )
+    ),
+    h('div', { className: 'screen-scroll', style: { flex: 1, padding: '14px 16px 110px', display: 'flex', flexDirection: 'column', gap: 4 } },
+      menuGroups.map(group =>
+        h('div', { key: group.title },
+          h('div', { style: { fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase', color: C.mut, padding: '14px 4px 8px' } }, group.title),
+          h(Card, { style: { overflow: 'hidden' } },
+            group.items.map((item, i) =>
+              h('div', {
+                key: item.label,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 13,
+                  padding: '13px 15px',
+                  borderBottom: i < group.items.length - 1 ? `1px solid ${C.line}` : 'none',
+                  cursor: 'pointer'
+                }
+              },
+                h('div', {
+                  style: {
+                    width: 40, height: 40, borderRadius: 12, background: item.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                  }
+                },
+                  h('i', { className: `ti ti-${item.icon}`, style: { fontSize: 20, color: item.color } })
+                ),
+                h('div', { style: { flex: 1 } },
+                  h('div', { style: { fontSize: 13.5, fontWeight: 700, color: C.ink } }, item.label),
+                  h('div', { style: { fontSize: 11.5, color: C.mut, marginTop: 2 } }, item.sub)
+                ),
+                item.badge && h('div', {
+                  style: {
+                    width: 20, height: 20, borderRadius: 99, background: C.danger,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 800, color: '#fff'
+                  }
+                }, item.badge),
+                h('i', { className: 'ti ti-chevron-right', style: { fontSize: 18, color: C.line } })
+              )
+            )
+          )
+        )
+      )
+    ),
+    h(BottomNav, { active: 3, onPress: onNavigate })
+  );
+}
+
+// ─── Root App ──────────────────────────────────────────────────
+function App() {
+  const initTab = parseInt(new URLSearchParams(location.search).get('tab') || '0');
+  const [tab, setTab] = useState(initTab);
+
+  const screens = {
+    0: h(ScreenDashboard, { onNavigate: setTab }),
+    1: h(ScreenLaporan,   { onNavigate: setTab }),
+    2: h(ScreenHSE,       { onNavigate: setTab }),
+    3: h(ScreenMore,      { onNavigate: setTab }),
+  };
+
+  return h('div', {
+    style: {
+      width: '100%', height: '100%',
+      position: 'relative', overflow: 'hidden',
+      background: C.bg
+    }
+  }, screens[tab] || screens[0]);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
