@@ -66,6 +66,8 @@ import {
   IconLink,
   IconCopy,
   IconExternalLink,
+  IconSpeakerphone,
+  IconFileDescription,
 } from '@tabler/icons-react-native';
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -135,6 +137,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   link: IconLink,
   copy: IconCopy,
   'external-link': IconExternalLink,
+  speakerphone: IconSpeakerphone,
+  'file-description': IconFileDescription,
 };
 
 interface Props {
