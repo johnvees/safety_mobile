@@ -128,14 +128,6 @@ const quickActions = [
     sub: 'Izin kerja HSE baru',
     route: 'PermitList' as const,
   },
-  {
-    icon: 'file-plus',
-    color: '#6366f1',
-    tint: '#ede9fe',
-    title: 'SoP / Dokumen Baru',
-    sub: 'Standard of Procedure',
-    route: 'CaseIncident' as const,
-  },
 ];
 
 export default function HomeScreen() {
@@ -710,7 +702,7 @@ const styles = StyleSheet.create({
   // Quick action overlay
   overlayBg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.55)',
+    backgroundColor: 'rgba(15,23,42,0.82)',
     justifyContent: 'flex-end',
   },
   qaPanel: {

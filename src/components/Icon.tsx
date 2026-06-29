@@ -68,6 +68,12 @@ import {
   IconExternalLink,
   IconSpeakerphone,
   IconFileDescription,
+  IconHeart,
+  IconHeartFilled,
+  IconSend,
+  IconMovie,
+  IconFile,
+  IconUpload,
 } from '@tabler/icons-react-native';
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -139,6 +145,12 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'external-link': IconExternalLink,
   speakerphone: IconSpeakerphone,
   'file-description': IconFileDescription,
+  heart: IconHeart,
+  'heart-filled': IconHeartFilled,
+  send: IconSend,
+  film: IconMovie,
+  file: IconFile,
+  upload: IconUpload,
 };
 
 interface Props {

@@ -11,6 +11,8 @@ export type RootStackParamList = {
   SettingsFull: undefined;
   MasterData: undefined;
   Chat: undefined;
+  HseModuleBuat: { moduleType: 'SoP' | 'WI' | 'Form' | 'Edukasi' };
+  HseModulDetail: { id: string; title: string; cat: string; module: string; updated: string };
 };
 
 export type BottomTabParamList = {

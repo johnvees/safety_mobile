@@ -11,6 +11,8 @@ import PermitDetailScreen from '@/screens/PermitDetailScreen';
 import NotifikasiScreen from '@/screens/NotifikasiScreen';
 import DashboardScreen from '@/screens/DashboardScreen';
 import SettingsScreen from '@/screens/SettingsScreen';
+import HseModuleBuatScreen from '@/screens/HseModuleBuatScreen';
+import HseModulDetailScreen from '@/screens/HseModulDetailScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -27,6 +29,8 @@ export default function RootNavigator() {
       <Stack.Screen name="Notifikasi" component={NotifikasiScreen} />
       <Stack.Screen name="DashboardFull" component={DashboardScreen} />
       <Stack.Screen name="SettingsFull" component={SettingsScreen} />
+      <Stack.Screen name="HseModuleBuat" component={HseModuleBuatScreen} />
+      <Stack.Screen name="HseModulDetail" component={HseModulDetailScreen} />
     </Stack.Navigator>
   );
 }
