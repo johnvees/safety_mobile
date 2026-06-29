@@ -28,11 +28,11 @@ export const Colors = C;
 
 export const GradientHeaders = {
   home: ['#3b82f6', '#2563eb'],
-  laporan: ['#3b82f6', '#2563eb'],
+  laporan: ['#6366f1', '#4338ca'],
   incident: ['#DC2626', '#B91C1C'],
   inspeksi: ['#16A34A', '#15803D'],
   permit: ['#D97706', '#B45309'],
-  hse: ['#2563EB', '#1E40AF'],
+  hse: ['#10b981', '#059669'],
   more: ['#0F172A', '#1E293B'],
 };
 

@@ -13,7 +13,7 @@ import Icon from '@/components/Icon';
 import { F } from '@/theme/typography';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { C, RoleColors } from '@/theme/colors';
+import { C, RoleColors, GradientHeaders } from '@/theme/colors';
 import { currentUser } from '@/data/mockData';
 import { RootStackParamList } from '@/navigation/types';
 import ScopePickerSheet from '@/components/ScopePickerSheet';
@@ -148,6 +148,12 @@ export default function HomeScreen() {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const panelSlide = useRef(new Animated.Value(60)).current;
+  const cardAnims = useRef(
+    quickActions.map(() => ({
+      opacity: new Animated.Value(0),
+      translateY: new Animated.Value(10),
+    }))
+  ).current;
 
   useEffect(() => {
     Animated.spring(rotateAnim, {
@@ -158,32 +164,39 @@ export default function HomeScreen() {
     }).start();
 
     if (fabOpen) {
+      cardAnims.forEach((a) => { a.opacity.setValue(0); a.translateY.setValue(12); });
       setOverlayMounted(true);
       Animated.parallel([
-        Animated.timing(overlayAnim, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-        Animated.spring(panelSlide, {
-          toValue: 0,
-          tension: 100,
-          friction: 10,
-          useNativeDriver: true,
-        }),
+        Animated.timing(overlayAnim, { toValue: 1, duration: 240, useNativeDriver: true }),
+        Animated.spring(panelSlide, { toValue: 0, tension: 90, friction: 11, useNativeDriver: true }),
+        Animated.stagger(
+          65,
+          cardAnims.map((a) =>
+            Animated.parallel([
+              Animated.timing(a.opacity, { toValue: 1, duration: 210, useNativeDriver: true }),
+              Animated.spring(a.translateY, { toValue: 0, tension: 120, friction: 12, useNativeDriver: true }),
+            ])
+          )
+        ),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(overlayAnim, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-        Animated.timing(panelSlide, {
-          toValue: 60,
-          duration: 180,
-          useNativeDriver: true,
-        }),
+        Animated.stagger(
+          25,
+          [...cardAnims].reverse().map((a) =>
+            Animated.parallel([
+              Animated.timing(a.opacity, { toValue: 0, duration: 110, useNativeDriver: true }),
+              Animated.timing(a.translateY, { toValue: 8, duration: 110, useNativeDriver: true }),
+            ])
+          )
+        ),
+        Animated.sequence([
+          Animated.delay(70),
+          Animated.parallel([
+            Animated.timing(overlayAnim, { toValue: 0, duration: 190, useNativeDriver: true }),
+            Animated.timing(panelSlide, { toValue: 60, duration: 190, useNativeDriver: true }),
+          ]),
+        ]),
       ]).start(() => setOverlayMounted(false));
     }
   }, [fabOpen]);
@@ -214,7 +227,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#60a5fa', '#3b82f6', '#1d4ed8']}
+        colors={GradientHeaders.home as [string, string]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 12 }]}
@@ -395,41 +408,36 @@ export default function HomeScreen() {
       {/* Quick action overlay */}
       {overlayMounted && (
         <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.overlayBg,
-            { opacity: overlayAnim },
-          ]}
+          style={[StyleSheet.absoluteFill, styles.overlayBg, { opacity: overlayAnim }]}
         >
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setFabOpen(false)} />
           <Animated.View
-            style={[
-              styles.qaPanel,
-              {
-                paddingBottom: insets.bottom + 80,
-                transform: [{ translateY: panelSlide }],
-              },
-            ]}
+            style={[styles.qaPanel, { paddingBottom: insets.bottom + 80, transform: [{ translateY: panelSlide }] }]}
           >
             <Text style={styles.qaLabel}>Aksi Cepat</Text>
-            {quickActions.map((qa) => (
-              <TouchableOpacity
+            {quickActions.map((qa, i) => (
+              <Animated.View
                 key={qa.title}
-                style={styles.qaCard}
-                activeOpacity={0.8}
-                onPress={() => {
-                  setFabOpen(false);
-                  navigation.navigate(qa.route);
-                }}
+                style={{ opacity: cardAnims[i].opacity, transform: [{ translateY: cardAnims[i].translateY }] }}
               >
-                <View style={[styles.qaIconWrap, { backgroundColor: qa.tint }]}>
-                  <Icon name={qa.icon} size={22} color={qa.color} />
-                </View>
-                <View style={styles.qaBody}>
-                  <Text style={styles.qaTitle}>{qa.title}</Text>
-                  <Text style={styles.qaSub}>{qa.sub}</Text>
-                </View>
-                <Icon name="chevron-right" size={16} color={C.mut} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.qaCard}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setFabOpen(false);
+                    navigation.navigate(qa.route);
+                  }}
+                >
+                  <View style={[styles.qaIconWrap, { backgroundColor: qa.tint }]}>
+                    <Icon name={qa.icon} size={22} color={qa.color} />
+                  </View>
+                  <View style={styles.qaBody}>
+                    <Text style={styles.qaTitle}>{qa.title}</Text>
+                    <Text style={styles.qaSub}>{qa.sub}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={16} color={C.mut} />
+                </TouchableOpacity>
+              </Animated.View>
             ))}
           </Animated.View>
         </Animated.View>
@@ -476,7 +484,7 @@ const styles = StyleSheet.create({
 
   // Header
   header: { paddingHorizontal: 18, paddingBottom: 16 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, height: 65 },
   avatar: {
     width: 42,
     height: 42,

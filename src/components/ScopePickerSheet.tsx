@@ -59,26 +59,93 @@ export default function ScopePickerSheet({
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(SHEET_MAX_H)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const buAnims = useRef(
+    Object.keys(SCOPE_DATA).map(() => ({ opacity: new Animated.Value(0), ty: new Animated.Value(10) }))
+  ).current;
+  const plantAnims = useRef(
+    Array.from({ length: 6 }, () => ({ opacity: new Animated.Value(1), ty: new Animated.Value(0) }))
+  ).current;
+  const deptAnims = useRef(
+    Array.from({ length: 6 }, () => ({ opacity: new Animated.Value(1), ty: new Animated.Value(0) }))
+  ).current;
 
   const parsedParts = currentScope.split(' > ');
   const [selBU, setSelBU] = useState(parsedParts[0] ?? '');
   const [selPlant, setSelPlant] = useState(parsedParts[1] ?? '');
   const [selDept, setSelDept] = useState(parsedParts[2] ?? '');
 
+  const isInitialBU = useRef(true);
+  const isInitialPlant = useRef(true);
+
   useEffect(() => {
     if (visible) {
+      isInitialBU.current = true;
+      isInitialPlant.current = true;
+
       translateY.setValue(SHEET_MAX_H);
       overlayOpacity.setValue(0);
+
       const parts = currentScope.split(' > ');
-      setSelBU(parts[0] ?? '');
-      setSelPlant(parts[1] ?? '');
-      setSelDept(parts[2] ?? '');
+      const initBU = parts[0] ?? '';
+      const initPlant = parts[1] ?? '';
+      const initDept = parts[2] ?? '';
+
+      setSelBU(initBU);
+      setSelPlant(initPlant);
+      setSelDept(initDept);
+
+      const plantCount = initBU ? Object.keys(SCOPE_DATA[initBU] ?? {}).length : 0;
+      const deptCount = initBU && initPlant ? (SCOPE_DATA[initBU]?.[initPlant] ?? []).length : 0;
+
+      buAnims.forEach((a) => { a.opacity.setValue(0); a.ty.setValue(10); });
+      plantAnims.slice(0, plantCount).forEach((a) => { a.opacity.setValue(0); a.ty.setValue(10); });
+      deptAnims.slice(0, deptCount).forEach((a) => { a.opacity.setValue(0); a.ty.setValue(10); });
+
+      const allItems = [
+        ...buAnims,
+        ...plantAnims.slice(0, plantCount),
+        ...deptAnims.slice(0, deptCount),
+      ];
+
       Animated.parallel([
         Animated.timing(overlayOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(translateY, { toValue: 0, tension: 100, friction: 12, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.delay(160),
+          Animated.stagger(50, allItems.map((a) =>
+            Animated.parallel([
+              Animated.timing(a.opacity, { toValue: 1, duration: 190, useNativeDriver: true }),
+              Animated.spring(a.ty, { toValue: 0, tension: 130, friction: 12, useNativeDriver: true }),
+            ])
+          )),
+        ]),
       ]).start();
     }
   }, [visible, currentScope]);
+
+  useEffect(() => {
+    if (isInitialBU.current) { isInitialBU.current = false; return; }
+    const count = Object.keys(SCOPE_DATA[selBU] ?? {}).length;
+    plantAnims.slice(0, count).forEach((a) => { a.opacity.setValue(0); a.ty.setValue(10); });
+    Animated.stagger(50, plantAnims.slice(0, count).map((a) =>
+      Animated.parallel([
+        Animated.timing(a.opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(a.ty, { toValue: 0, tension: 130, friction: 12, useNativeDriver: true }),
+      ])
+    )).start();
+  }, [selBU]);
+
+  useEffect(() => {
+    if (isInitialPlant.current) { isInitialPlant.current = false; return; }
+    const count = (SCOPE_DATA[selBU]?.[selPlant] ?? []).length;
+    deptAnims.slice(0, count).forEach((a) => { a.opacity.setValue(0); a.ty.setValue(10); });
+    Animated.stagger(45, deptAnims.slice(0, count).map((a) =>
+      Animated.parallel([
+        Animated.timing(a.opacity, { toValue: 1, duration: 170, useNativeDriver: true }),
+        Animated.spring(a.ty, { toValue: 0, tension: 130, friction: 12, useNativeDriver: true }),
+      ])
+    )).start();
+  }, [selPlant]);
 
   const handleClose = () => {
     Animated.parallel([
@@ -185,25 +252,22 @@ export default function ScopePickerSheet({
           >
             {/* Business Unit */}
             <Text style={styles.sectionLabel}>1 · BUSINESS UNIT</Text>
-            {businessUnits.map((bu) => {
+            {businessUnits.map((bu, i) => {
               const active = selBU === bu;
               return (
-                <TouchableOpacity
-                  key={bu}
-                  style={[styles.row, active && styles.rowActive]}
-                  onPress={() => handleSelectBU(bu)}
-                  activeOpacity={0.75}
-                >
-                  <View style={[styles.radio, active && styles.radioActive]}>
-                    {active && <Icon name="check" size={13} color={C.white} />}
-                  </View>
-                  <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>
-                    {bu}
-                  </Text>
-                  {active && (
-                    <Icon name="chevron-right" size={16} color="#3b82f6" />
-                  )}
-                </TouchableOpacity>
+                <Animated.View key={bu} style={{ opacity: buAnims[i].opacity, transform: [{ translateY: buAnims[i].ty }] }}>
+                  <TouchableOpacity
+                    style={[styles.row, active && styles.rowActive]}
+                    onPress={() => handleSelectBU(bu)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.radio, active && styles.radioActive]}>
+                      {active && <Icon name="check" size={13} color={C.white} />}
+                    </View>
+                    <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>{bu}</Text>
+                    {active && <Icon name="chevron-right" size={16} color="#3b82f6" />}
+                  </TouchableOpacity>
+                </Animated.View>
               );
             })}
 
@@ -211,27 +275,22 @@ export default function ScopePickerSheet({
             {plants.length > 0 && (
               <>
                 <Text style={styles.sectionLabel}>2 · PLANT</Text>
-                {plants.map((plant) => {
+                {plants.map((plant, i) => {
                   const active = selPlant === plant;
                   return (
-                    <TouchableOpacity
-                      key={plant}
-                      style={[styles.row, active && styles.rowActive]}
-                      onPress={() => handleSelectPlant(plant)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={[styles.radio, active && styles.radioActive]}>
-                        {active && (
-                          <Icon name="check" size={13} color={C.white} />
-                        )}
-                      </View>
-                      <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>
-                        {plant}
-                      </Text>
-                      {active && (
-                        <Icon name="chevron-right" size={16} color="#3b82f6" />
-                      )}
-                    </TouchableOpacity>
+                    <Animated.View key={plant} style={{ opacity: plantAnims[i].opacity, transform: [{ translateY: plantAnims[i].ty }] }}>
+                      <TouchableOpacity
+                        style={[styles.row, active && styles.rowActive]}
+                        onPress={() => handleSelectPlant(plant)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[styles.radio, active && styles.radioActive]}>
+                          {active && <Icon name="check" size={13} color={C.white} />}
+                        </View>
+                        <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>{plant}</Text>
+                        {active && <Icon name="chevron-right" size={16} color="#3b82f6" />}
+                      </TouchableOpacity>
+                    </Animated.View>
                   );
                 })}
               </>
@@ -241,27 +300,22 @@ export default function ScopePickerSheet({
             {departments.length > 0 && (
               <>
                 <Text style={styles.sectionLabel}>3 · DEPARTMENT</Text>
-                {departments.map((dept) => {
+                {departments.map((dept, i) => {
                   const active = selDept === dept;
                   return (
-                    <TouchableOpacity
-                      key={dept}
-                      style={[styles.row, active && styles.rowActive]}
-                      onPress={() => setSelDept(dept)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={[styles.radio, active && styles.radioActive]}>
-                        {active && (
-                          <Icon name="check" size={13} color={C.white} />
-                        )}
-                      </View>
-                      <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>
-                        {dept}
-                      </Text>
-                      {active && (
-                        <Icon name="chevron-right" size={16} color="#3b82f6" />
-                      )}
-                    </TouchableOpacity>
+                    <Animated.View key={dept} style={{ opacity: deptAnims[i].opacity, transform: [{ translateY: deptAnims[i].ty }] }}>
+                      <TouchableOpacity
+                        style={[styles.row, active && styles.rowActive]}
+                        onPress={() => setSelDept(dept)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[styles.radio, active && styles.radioActive]}>
+                          {active && <Icon name="check" size={13} color={C.white} />}
+                        </View>
+                        <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>{dept}</Text>
+                        {active && <Icon name="chevron-right" size={16} color="#3b82f6" />}
+                      </TouchableOpacity>
+                    </Animated.View>
                   );
                 })}
               </>
