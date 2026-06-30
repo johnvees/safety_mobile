@@ -34,7 +34,7 @@ export default function MoreScreen() {
       <LinearGradient
         colors={GradientHeaders.more as [string, string]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.profileHeader, { paddingTop: insets.top + 16 }]}
+        style={[styles.profileHeader, { paddingTop: insets.top + 12 }]}
       >
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
@@ -127,8 +127,8 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
-  profileHeader: { paddingHorizontal: 20, paddingBottom: 20 },
-  profileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  profileHeader: { paddingHorizontal: 18, paddingBottom: 32 },
+  profileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, minHeight: 65 },
   avatar: {
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center',
