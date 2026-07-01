@@ -60,6 +60,10 @@ export default function ChatBubble({
 
   const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] });
 
+  const mediaAttachments = attachments.filter((a) => a.type === 'image' || a.type === 'video');
+  const otherAttachments = attachments.filter((a) => a.type === 'file' || a.type === 'audio');
+  const isMediaGrouped = mediaAttachments.length >= 4;
+
   async function openFile(a: ChatAttachment) {
     if (a.mimeType === 'application/pdf') {
       setViewerPdf({ uri: a.uri, name: a.name });
@@ -152,10 +156,45 @@ export default function ChatBubble({
             )}
             {attachments.length > 0 && (
               <View style={styles.attachments}>
-                {attachments.map((a) =>
+                {isMediaGrouped ? (
+                  <View style={styles.mediaGrid}>
+                    {mediaAttachments.map((a) => (
+                      <TouchableOpacity
+                        key={a.id}
+                        style={styles.mediaGridItem}
+                        activeOpacity={0.85}
+                        onPress={() => setViewerMedia({ type: a.type as 'image' | 'video', uri: a.uri })}
+                      >
+                        <Image source={{ uri: a.uri }} style={styles.mediaGridImage} />
+                        {a.type === 'video' && (
+                          <View style={styles.playOverlay}>
+                            <Icon name="play-circle" size={20} color="#fff" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  mediaAttachments.map((a) => (
+                    <TouchableOpacity
+                      key={a.id}
+                      style={styles.mediaWrap}
+                      activeOpacity={0.85}
+                      onPress={() => setViewerMedia({ type: a.type as 'image' | 'video', uri: a.uri })}
+                    >
+                      <Image source={{ uri: a.uri }} style={styles.mediaImage} />
+                      {a.type === 'video' && (
+                        <View style={styles.playOverlay}>
+                          <Icon name="play-circle" size={26} color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))
+                )}
+                {otherAttachments.map((a) =>
                   a.type === 'audio' ? (
                     <VoiceMessage key={a.id} uri={a.uri} duration={a.duration} isMe={isMe} />
-                  ) : a.type === 'file' ? (
+                  ) : (
                     <TouchableOpacity
                       key={a.id}
                       style={styles.fileChip}
@@ -169,20 +208,6 @@ export default function ChatBubble({
                       >
                         {a.name}
                       </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      key={a.id}
-                      style={styles.mediaWrap}
-                      activeOpacity={0.85}
-                      onPress={() => setViewerMedia({ type: a.type as 'image' | 'video', uri: a.uri })}
-                    >
-                      <Image source={{ uri: a.uri }} style={styles.mediaImage} />
-                      {a.type === 'video' && (
-                        <View style={styles.playOverlay}>
-                          <Icon name="play-circle" size={26} color="#fff" />
-                        </View>
-                      )}
                     </TouchableOpacity>
                   ),
                 )}
@@ -284,6 +309,9 @@ const styles = StyleSheet.create({
   attachments: { gap: 6, marginBottom: 4 },
   mediaWrap: { borderRadius: 12, overflow: 'hidden', position: 'relative' },
   mediaImage: { width: 180, height: 130, backgroundColor: C.line },
+  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', width: 184, gap: 4 },
+  mediaGridItem: { width: 88, height: 88, borderRadius: 10, overflow: 'hidden', position: 'relative' },
+  mediaGridImage: { width: '100%', height: '100%', backgroundColor: C.line },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',

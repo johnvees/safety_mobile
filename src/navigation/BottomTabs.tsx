@@ -72,7 +72,13 @@ export default function BottomTabs() {
         options={{
           tabBarLabel: 'Chat',
           tabBarBadge: 3,
-          tabBarBadgeStyle: { backgroundColor: C.danger, fontFamily: F.bold, fontSize: 10 },
+          tabBarBadgeStyle: {
+            backgroundColor: C.danger,
+            fontFamily: F.bold,
+            fontSize: 10,
+            lineHeight: 14,
+            textAlignVertical: 'center',
+          },
         }}
       />
       <Tab.Screen

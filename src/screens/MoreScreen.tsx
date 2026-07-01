@@ -177,7 +177,14 @@ const styles = StyleSheet.create({
     backgroundColor: C.danger, borderRadius: 10,
     minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
   },
-  unreadText: { fontSize: 11, fontFamily: F.extraBold, color: '#fff' },
+  unreadText: {
+    fontSize: 11,
+    fontFamily: F.extraBold,
+    color: '#fff',
+    lineHeight: 16,
+    includeFontPadding: false,
+    textAlign: 'center',
+  },
   lockedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: C.surface, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
