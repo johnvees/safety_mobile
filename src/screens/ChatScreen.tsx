@@ -1,51 +1,34 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import Icon from '@/components/Icon';
 import { C, GradientHeaders } from '@/theme/colors';
 import { F } from '@/theme/typography';
 import GradientHeader from '@/components/GradientHeader';
+import ChatFabMenu from '@/components/ChatFabMenu';
+import SwipeableRow from '@/components/SwipeableRow';
+import { useChatStore } from '@/context/ChatContext';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/navigation/types';
 
-const CONVERSATIONS = [
-  {
-    id: '1',
-    name: 'Tim HSE Pusat',
-    lastMessage: 'Mohon segera lengkapi laporan inspeksi minggu ini.',
-    time: '09:12',
-    unread: 2,
-    color: C.teal,
-  },
-  {
-    id: '2',
-    name: 'Budi Santoso',
-    lastMessage: 'Sudah saya upload dokumen JSA-nya pak.',
-    time: '08:45',
-    unread: 1,
-    color: C.ok,
-  },
-  {
-    id: '3',
-    name: 'Koordinator K3 Area B',
-    lastMessage: 'Terima kasih konfirmasinya.',
-    time: 'Kemarin',
-    unread: 0,
-    color: C.warn,
-  },
-  {
-    id: '4',
-    name: 'Grup Inspeksi Lapangan',
-    lastMessage: 'Jadwal inspeksi besok pindah jadi jam 08.00.',
-    time: 'Kemarin',
-    unread: 0,
-    color: C.violet,
-  },
-];
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ChatScreen() {
+  const navigation = useNavigation<Nav>();
   const [search, setSearch] = useState('');
+  const { conversations, archiveChat, softDeleteChat } = useChatStore();
   const searchQ = search.trim().toLowerCase();
-  const filtered = CONVERSATIONS.filter((c) =>
-    c.name.toLowerCase().includes(searchQ),
+  const archivedList = conversations.filter((c) => c.archived && !c.deletedAt);
+  const filtered = conversations.filter(
+    (c) => !c.archived && !c.deletedAt && c.name.toLowerCase().includes(searchQ),
   );
+
+  function deleteChat(id: string) {
+    Alert.alert('Hapus Percakapan', 'Percakapan akan dipindahkan ke Pesan Terhapus.', [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Hapus', style: 'destructive', onPress: () => softDeleteChat(id) },
+    ]);
+  }
 
   return (
     <View style={styles.container}>
@@ -55,14 +38,23 @@ export default function ChatScreen() {
         subtitle={
           <View style={styles.headerSearch}>
             <View style={styles.headerSearchInput}>
-              <Icon name="search" size={16} color="rgba(255,255,255,0.7)" />
+              <Icon name="search" size={15} color="rgba(255,255,255,0.6)" />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
                 placeholder="Cari percakapan..."
-                placeholderTextColor="rgba(255,255,255,0.6)"
+                placeholderTextColor="rgba(255,255,255,0.5)"
                 style={styles.headerSearchText}
+                returnKeyType="search"
               />
+              {search.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearch('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Icon name="x" size={14} color="rgba(255,255,255,0.7)" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         }
@@ -73,6 +65,23 @@ export default function ChatScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {archivedList.length > 0 && (
+          <TouchableOpacity
+            style={styles.archivedRow}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('ChatArchived')}
+          >
+            <View style={styles.archivedIconWrap}>
+              <Icon name="archive" size={18} color={C.teal} />
+            </View>
+            <Text style={styles.archivedLabel}>Chat Diarsipkan</Text>
+            <View style={styles.archivedCountBadge}>
+              <Text style={styles.archivedCountText}>{archivedList.length}</Text>
+            </View>
+            <Icon name="chevron-right" size={16} color={C.mut} />
+          </TouchableOpacity>
+        )}
+
         {filtered.length === 0 ? (
           <View style={styles.empty}>
             <Icon name="message-circle" size={40} color={C.mut} />
@@ -80,39 +89,49 @@ export default function ChatScreen() {
           </View>
         ) : (
           filtered.map((c, i) => (
-            <TouchableOpacity
-              key={c.id}
-              style={[styles.row, i < filtered.length - 1 && styles.rowBorder]}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.avatar, { backgroundColor: c.color }]}>
-                <Text style={styles.avatarText}>
-                  {c.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.body}>
-                <Text style={styles.name} numberOfLines={1}>{c.name}</Text>
-                <Text style={styles.lastMsg} numberOfLines={1}>{c.lastMessage}</Text>
-              </View>
-              <View style={styles.meta}>
-                <Text style={styles.time}>{c.time}</Text>
-                {c.unread > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadText}>{c.unread}</Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
+            <SwipeableRow key={c.id} onArchive={() => archiveChat(c.id)} onDelete={() => deleteChat(c.id)}>
+              <TouchableOpacity
+                style={[styles.row, i < filtered.length - 1 && styles.rowBorder]}
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate('ChatConversation', {
+                    contactId: c.id,
+                    name: c.name,
+                    color: c.color,
+                  })
+                }
+              >
+                <View style={[styles.avatar, { backgroundColor: c.color }]}>
+                  <Text style={styles.avatarText}>
+                    {c.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.body}>
+                  <Text style={styles.name} numberOfLines={1}>{c.name}</Text>
+                  <Text style={styles.lastMsg} numberOfLines={1}>{c.lastMessage}</Text>
+                </View>
+                <View style={styles.meta}>
+                  <Text style={styles.time}>{c.time}</Text>
+                  {c.unread > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadText}>{c.unread}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            </SwipeableRow>
           ))
         )}
       </ScrollView>
+
+      <ChatFabMenu />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
-  headerSearch: { flexDirection: 'row' },
+  headerSearch: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerSearchInput: {
     flex: 1,
     flexDirection: 'row',
@@ -120,17 +139,51 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.55)',
     paddingHorizontal: 12,
-    height: 38,
+    height: 36,
   },
-  headerSearchText: { flex: 1, color: '#fff', fontSize: 13.5, fontFamily: F.medium },
+  headerSearchText: { flex: 1, color: '#fff', fontSize: 13, fontFamily: F.regular, height: 36 },
+  archivedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: C.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.line,
+    marginBottom: 10,
+  },
+  archivedIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: C.teal100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  archivedLabel: { flex: 1, fontSize: 14, fontFamily: F.bold, color: C.ink },
+  archivedCountBadge: {
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    minWidth: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  archivedCountText: { fontSize: 11.5, fontFamily: F.bold, color: C.sec },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 32 },
+  scrollContent: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 100 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 14,
+    backgroundColor: C.bg,
   },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: C.line },
   avatar: {

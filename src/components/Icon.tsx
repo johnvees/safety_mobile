@@ -74,6 +74,7 @@ import {
   IconMovie,
   IconFile,
   IconUpload,
+  IconArchive,
 } from '@tabler/icons-react-native';
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -151,6 +152,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   film: IconMovie,
   file: IconFile,
   upload: IconUpload,
+  archive: IconArchive,
 };
 
 interface Props {

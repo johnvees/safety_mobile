@@ -9,17 +9,21 @@ import { C, GradientHeaders } from '@/theme/colors';
 import { F } from '@/theme/typography';
 import { currentUser } from '@/data/mockData';
 import { RootStackParamList } from '@/navigation/types';
+import { useChatStore } from '@/context/ChatContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function MoreScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
+  const { conversations } = useChatStore();
+  const trashedCount = conversations.filter((c) => !!c.deletedAt).length;
   const initials = currentUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
   const MODUL = [
     { icon: 'bar-chart-2', label: 'Laporan & Analitik', badge: 0, onPress: () => navigation.navigate('DashboardFull') },
     { icon: 'calendar', label: 'Jadwal Inspeksi', badge: 0, onPress: () => navigation.navigate('InspeksiList') },
+    { icon: 'trash', label: 'Pesan Terhapus', badge: trashedCount, onPress: () => navigation.navigate('ChatTrash') },
   ];
 
   const ADMIN = [

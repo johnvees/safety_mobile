@@ -12,6 +12,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import RootNavigator from '@/navigation/RootNavigator';
+import { ChatProvider } from '@/context/ChatContext';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -28,10 +29,12 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="auto" />
-        <RootNavigator />
-      </NavigationContainer>
+      <ChatProvider>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </NavigationContainer>
+      </ChatProvider>
     </SafeAreaProvider>
   );
 }

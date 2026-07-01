@@ -11,6 +11,11 @@ export type RootStackParamList = {
   SettingsFull: undefined;
   MasterData: undefined;
   Chat: undefined;
+  ChatContactPicker: undefined;
+  ChatConversation: { contactId: string; name: string; color: string };
+  ChatProfile: { name: string; color: string };
+  ChatArchived: undefined;
+  ChatTrash: undefined;
   HseModuleBuat: { moduleType: 'SoP' | 'WI' | 'Form' | 'Edukasi' };
   HseModulDetail: {
     id: string;
