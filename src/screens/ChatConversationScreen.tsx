@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
 import Icon from '@/components/Icon';
 import ChatBubble from '@/components/ChatBubble';
 import { C, GradientHeaders } from '@/theme/colors';
 import { F } from '@/theme/typography';
-import { CONVERSATIONS, ChatMessage, ChatAttachment, ChatReplyRef } from '@/data/chatData';
+import { ChatMessage, ChatAttachment, ChatReplyRef, getProfile, formatDateSeparator } from '@/data/chatData';
+import { useChatStore } from '@/context/ChatContext';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/types';
@@ -32,43 +34,47 @@ export default function ChatConversationScreen() {
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<Rt>();
   const insets = useSafeAreaInsets();
-  const existing = CONVERSATIONS.find((c) => c.id === params.contactId);
-  const [messages, setMessages] = useState<ChatMessage[]>(existing?.messages ?? []);
+  const { conversations, sendMessage, editMessage, unsendMessage, toggleStar, forwardMessage } =
+    useChatStore();
+  const conversation = conversations.find((c) => c.id === params.contactId);
+  const messages = conversation?.messages ?? [];
+  const profile = getProfile(params.name);
+
   const [draft, setDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [actionSheetMsg, setActionSheetMsg] = useState<ChatMessage | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<ChatReplyRef | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  function nowTime() {
-    return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  }
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const blocked = !!conversation?.blocked;
+
+  useEffect(() => {
+    return () => {
+      if (recordTimer.current) clearInterval(recordTimer.current);
+    };
+  }, []);
 
   function send() {
     const text = draft.trim();
     if (!text && pendingAttachments.length === 0) return;
 
     if (editingId) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === editingId ? { ...m, text, edited: true } : m)),
-      );
+      editMessage(params.contactId, editingId, text);
       setEditingId(null);
       setDraft('');
       return;
     }
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `local-${Date.now()}`,
-        text,
-        isMe: true,
-        time: nowTime(),
-        attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
-        replyTo: replyingTo ?? undefined,
-      },
-    ]);
+    sendMessage(params.contactId, {
+      text,
+      attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
+      replyTo: replyingTo ?? undefined,
+    });
     setDraft('');
     setPendingAttachments([]);
     setReplyingTo(null);
@@ -99,21 +105,26 @@ export default function ChatConversationScreen() {
     setDraft('');
   }
 
-  function unsendMessage(msg: ChatMessage) {
+  function unsend(msg: ChatMessage) {
     setActionSheetMsg(null);
     Alert.alert('Hapus Pesan', 'Hapus pesan ini untuk semua orang?', [
       { text: 'Batal', style: 'cancel' },
       {
         text: 'Hapus',
         style: 'destructive',
-        onPress: () =>
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === msg.id ? { ...m, deleted: true, text: '', attachments: undefined } : m,
-            ),
-          ),
+        onPress: () => unsendMessage(params.contactId, msg.id),
       },
     ]);
+  }
+
+  function star(msg: ChatMessage) {
+    toggleStar(params.contactId, msg.id);
+    setActionSheetMsg(null);
+  }
+
+  function forward(msg: ChatMessage) {
+    setActionSheetMsg(null);
+    navigation.navigate('ChatContactPicker', { forwardMessage: msg });
   }
 
   async function pickMedia() {
@@ -155,6 +166,48 @@ export default function ChatConversationScreen() {
     setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
   }
 
+  async function startRecording() {
+    if (draft.trim() || pendingAttachments.length > 0) return;
+    const perm = await AudioModule.requestRecordingPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Izin diperlukan', 'Akses mikrofon diperlukan untuk mengirim pesan suara.');
+      return;
+    }
+    await recorder.prepareToRecordAsync();
+    recorder.record();
+    setIsRecording(true);
+    setRecordSeconds(0);
+    recordTimer.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
+  }
+
+  async function stopRecording() {
+    if (!isRecording) return;
+    if (recordTimer.current) {
+      clearInterval(recordTimer.current);
+      recordTimer.current = null;
+    }
+    setIsRecording(false);
+    await recorder.stop();
+    const uri = recorder.uri;
+    if (uri) {
+      sendMessage(params.contactId, {
+        text: '',
+        attachments: [
+          {
+            id: `att-${Date.now()}`,
+            type: 'audio',
+            uri,
+            name: 'Pesan suara',
+            duration: recordSeconds,
+          },
+        ],
+      });
+    }
+    setRecordSeconds(0);
+  }
+
+  const showMic = !draft.trim() && pendingAttachments.length === 0 && !editingId;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -177,14 +230,27 @@ export default function ChatConversationScreen() {
         <TouchableOpacity
           style={styles.headerProfile}
           activeOpacity={0.75}
-          onPress={() => navigation.navigate('ChatProfile', { name: params.name, color: params.color })}
+          onPress={() =>
+            navigation.navigate('ChatProfile', {
+              contactId: params.contactId,
+              name: params.name,
+              color: params.color,
+            })
+          }
         >
           <View style={[styles.avatar, { backgroundColor: params.color }]}>
             <Text style={styles.avatarText}>
               {params.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
             </Text>
           </View>
-          <Text style={styles.title} numberOfLines={1}>{params.name}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title} numberOfLines={1}>{params.name}</Text>
+            {profile.online ? (
+              <Text style={styles.presence}>online</Text>
+            ) : profile.lastSeen ? (
+              <Text style={styles.presence} numberOfLines={1}>{profile.lastSeen}</Text>
+            ) : null}
+          </View>
         </TouchableOpacity>
         <View style={styles.iconBtnPlaceholder} />
       </LinearGradient>
@@ -200,20 +266,33 @@ export default function ChatConversationScreen() {
             <Text style={styles.emptyText}>Mulai percakapan dengan {params.name}</Text>
           </View>
         ) : (
-          messages.map((m) => (
-            <ChatBubble
-              key={m.id}
-              message={m.text}
-              isMe={m.isMe}
-              timestamp={m.time}
-              attachments={m.attachments}
-              edited={m.edited}
-              deleted={m.deleted}
-              replyTo={m.replyTo}
-              onLongPress={!m.deleted ? () => setActionSheetMsg(m) : undefined}
-              onSwipeReply={!m.deleted ? () => startReply(m) : undefined}
-            />
-          ))
+          messages.map((m, i) => {
+            const prevDayKey = i > 0 ? messages[i - 1].dayKey : undefined;
+            const dayKey = m.dayKey;
+            const showSeparator = !!dayKey && dayKey !== prevDayKey;
+            return (
+              <React.Fragment key={m.id}>
+                {showSeparator && (
+                  <View style={styles.dateSeparatorWrap}>
+                    <Text style={styles.dateSeparatorText}>{formatDateSeparator(dayKey!)}</Text>
+                  </View>
+                )}
+                <ChatBubble
+                  message={m.text}
+                  isMe={m.isMe}
+                  timestamp={m.time}
+                  attachments={m.attachments}
+                  edited={m.edited}
+                  deleted={m.deleted}
+                  replyTo={m.replyTo}
+                  status={m.status}
+                  starred={m.starred}
+                  onLongPress={!m.deleted ? () => setActionSheetMsg(m) : undefined}
+                  onSwipeReply={!m.deleted ? () => startReply(m) : undefined}
+                />
+              </React.Fragment>
+            );
+          })
         )}
       </ScrollView>
 
@@ -265,26 +344,47 @@ export default function ChatConversationScreen() {
         </View>
       )}
 
-      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <TouchableOpacity style={styles.attachBtn} onPress={() => setAttachMenuOpen(true)}>
-          <Icon name="plus" size={20} color={C.mut} />
-        </TouchableOpacity>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="Tulis pesan..."
-          placeholderTextColor={C.mut}
-          style={styles.input}
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, !draft.trim() && pendingAttachments.length === 0 && styles.sendBtnDisabled]}
-          onPress={send}
-          disabled={!draft.trim() && pendingAttachments.length === 0}
-        >
-          <Icon name={editingId ? 'check' : 'send'} size={18} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {blocked ? (
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <Text style={styles.blockedText}>Kontak ini telah diblokir</Text>
+        </View>
+      ) : (
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <TouchableOpacity style={styles.attachBtn} onPress={() => setAttachMenuOpen(true)}>
+            <Icon name="plus" size={20} color={C.mut} />
+          </TouchableOpacity>
+          {isRecording ? (
+            <View style={styles.recordingRow}>
+              <View style={styles.recordingDot} />
+              <Text style={styles.recordingText}>
+                Merekam... {Math.floor(recordSeconds / 60)}:{(recordSeconds % 60).toString().padStart(2, '0')}
+              </Text>
+            </View>
+          ) : (
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Tulis pesan..."
+              placeholderTextColor={C.mut}
+              style={styles.input}
+              multiline
+            />
+          )}
+          {showMic ? (
+            <TouchableOpacity
+              style={[styles.sendBtn, isRecording && styles.sendBtnRecording]}
+              onPressIn={startRecording}
+              onPressOut={stopRecording}
+            >
+              <Icon name="mic" size={18} color="#fff" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.sendBtn} onPress={send}>
+              <Icon name={editingId ? 'check' : 'send'} size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       <Modal visible={attachMenuOpen} transparent animationType="fade">
         <TouchableOpacity
@@ -333,6 +433,26 @@ export default function ChatConversationScreen() {
               </View>
               <Text style={styles.sheetLabel}>Balas</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sheetOption}
+              onPress={() => actionSheetMsg && forward(actionSheetMsg)}
+            >
+              <View style={[styles.sheetIconWrap, { backgroundColor: C.teal100 }]}>
+                <Icon name="corner-up-right" size={20} color={C.teal} />
+              </View>
+              <Text style={styles.sheetLabel}>Teruskan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sheetOption}
+              onPress={() => actionSheetMsg && star(actionSheetMsg)}
+            >
+              <View style={[styles.sheetIconWrap, { backgroundColor: C.teal100 }]}>
+                <Icon name="star" size={20} color={C.teal} />
+              </View>
+              <Text style={styles.sheetLabel}>
+                {actionSheetMsg?.starred ? 'Batal Bintangi' : 'Bintangi'}
+              </Text>
+            </TouchableOpacity>
             {actionSheetMsg?.isMe && (
               <>
                 <TouchableOpacity
@@ -346,7 +466,7 @@ export default function ChatConversationScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.sheetOption}
-                  onPress={() => actionSheetMsg && unsendMessage(actionSheetMsg)}
+                  onPress={() => actionSheetMsg && unsend(actionSheetMsg)}
                 >
                   <View style={[styles.sheetIconWrap, { backgroundColor: C.red100 }]}>
                     <Icon name="trash" size={20} color={C.danger} />
@@ -392,11 +512,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { fontSize: 13, fontFamily: F.extraBold, color: '#fff' },
-  title: { flex: 1, fontSize: 17, fontFamily: F.bold, color: '#fff' },
+  title: { fontSize: 17, fontFamily: F.bold, color: '#fff' },
+  presence: { fontSize: 11.5, color: 'rgba(255,255,255,0.75)', fontFamily: F.medium, marginTop: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyText: { fontSize: 13.5, color: C.mut, fontFamily: F.medium, textAlign: 'center' },
+  dateSeparatorWrap: { alignItems: 'center', marginVertical: 12 },
+  dateSeparatorText: {
+    fontSize: 11.5,
+    fontFamily: F.bold,
+    color: C.sec,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
   pendingRow: { maxHeight: 76, backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.line },
   pendingRowContent: { paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   pendingChip: { position: 'relative' },
@@ -455,6 +589,7 @@ const styles = StyleSheet.create({
     borderTopColor: C.line,
     backgroundColor: C.white,
   },
+  blockedText: { flex: 1, textAlign: 'center', fontSize: 13, color: C.mut, fontFamily: F.medium, paddingVertical: 10 },
   attachBtn: {
     width: 40,
     height: 40,
@@ -478,6 +613,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  recordingRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.bg,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.line,
+    paddingHorizontal: 14,
+    height: 40,
+  },
+  recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.danger },
+  recordingText: { fontSize: 13, fontFamily: F.medium, color: C.ink },
   sendBtn: {
     width: 40,
     height: 40,
@@ -486,7 +635,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnDisabled: { opacity: 0.4 },
+  sendBtnRecording: { backgroundColor: C.danger },
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: C.white,

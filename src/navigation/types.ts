@@ -13,7 +13,7 @@ export type RootStackParamList = {
   Chat: undefined;
   ChatContactPicker: undefined;
   ChatConversation: { contactId: string; name: string; color: string };
-  ChatProfile: { name: string; color: string };
+  ChatProfile: { contactId: string; name: string; color: string };
   ChatArchived: undefined;
   ChatTrash: undefined;
   HseModuleBuat: { moduleType: 'SoP' | 'WI' | 'Form' | 'Edukasi' };
