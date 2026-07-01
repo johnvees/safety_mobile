@@ -1,10 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Animated, View, Text, Image, StyleSheet, TouchableOpacity, PanResponder } from 'react-native';
+import * as Sharing from 'expo-sharing';
 import Icon from '@/components/Icon';
 import { C } from '@/theme/colors';
 import { F } from '@/theme/typography';
 import { ChatAttachment, ChatReplyRef } from '@/data/chatData';
 import VoiceMessage from '@/components/VoiceMessage';
+import MediaViewerModal from '@/components/MediaViewerModal';
+import PdfViewerModal from '@/components/PdfViewerModal';
 
 const SWIPE_MAX = 60;
 const SWIPE_TRIGGER = 44;
@@ -38,6 +41,19 @@ export default function ChatBubble({
 }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(0)).current;
+  const [viewerMedia, setViewerMedia] = useState<{ type: 'image' | 'video'; uri: string } | null>(null);
+  const [viewerPdf, setViewerPdf] = useState<{ uri: string; name: string } | null>(null);
+
+  async function openFile(a: ChatAttachment) {
+    if (a.mimeType === 'application/pdf') {
+      setViewerPdf({ uri: a.uri, name: a.name });
+      return;
+    }
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      Sharing.shareAsync(a.uri, a.mimeType ? { mimeType: a.mimeType } : undefined);
+    }
+  }
 
   const panResponder = useRef(
     PanResponder.create({
@@ -106,7 +122,12 @@ export default function ChatBubble({
                   a.type === 'audio' ? (
                     <VoiceMessage key={a.id} uri={a.uri} duration={a.duration} isMe={isMe} />
                   ) : a.type === 'file' ? (
-                    <View key={a.id} style={styles.fileChip}>
+                    <TouchableOpacity
+                      key={a.id}
+                      style={styles.fileChip}
+                      activeOpacity={0.7}
+                      onPress={() => openFile(a)}
+                    >
                       <Icon name="file-text" size={16} color={isMe ? '#fff' : C.ink} />
                       <Text
                         style={[styles.fileName, { color: isMe ? '#fff' : C.ink }]}
@@ -114,16 +135,21 @@ export default function ChatBubble({
                       >
                         {a.name}
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                   ) : (
-                    <View key={a.id} style={styles.mediaWrap}>
+                    <TouchableOpacity
+                      key={a.id}
+                      style={styles.mediaWrap}
+                      activeOpacity={0.85}
+                      onPress={() => setViewerMedia({ type: a.type as 'image' | 'video', uri: a.uri })}
+                    >
                       <Image source={{ uri: a.uri }} style={styles.mediaImage} />
                       {a.type === 'video' && (
                         <View style={styles.playOverlay}>
                           <Icon name="play-circle" size={26} color="#fff" />
                         </View>
                       )}
-                    </View>
+                    </TouchableOpacity>
                   ),
                 )}
               </View>
@@ -149,6 +175,22 @@ export default function ChatBubble({
           />
         ) : null}
       </View>
+      {viewerMedia && (
+        <MediaViewerModal
+          visible
+          type={viewerMedia.type}
+          uri={viewerMedia.uri}
+          onClose={() => setViewerMedia(null)}
+        />
+      )}
+      {viewerPdf && (
+        <PdfViewerModal
+          visible
+          uri={viewerPdf.uri}
+          name={viewerPdf.name}
+          onClose={() => setViewerPdf(null)}
+        />
+      )}
     </View>
   );
 }

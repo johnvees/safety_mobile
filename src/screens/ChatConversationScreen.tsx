@@ -158,6 +158,7 @@ export default function ChatConversationScreen() {
       type: 'file',
       uri: a.uri,
       name: a.name,
+      mimeType: a.mimeType,
     }));
     setPendingAttachments((prev) => [...prev, ...picked]);
   }

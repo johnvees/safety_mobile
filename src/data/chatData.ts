@@ -6,6 +6,7 @@ export interface ChatAttachment {
   uri: string;
   name: string;
   duration?: number; // seconds, audio only
+  mimeType?: string; // file only, used to detect PDFs for in-app viewing
 }
 
 export interface ChatReplyRef {

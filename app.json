@@ -31,7 +31,8 @@
         {
           "microphonePermission": "Aplikasi memerlukan akses mikrofon untuk mengirim pesan suara."
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }
