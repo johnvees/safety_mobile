@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   typeBadgeText: { fontSize: 11, fontFamily: F.bold },
   statusBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20 },
   statusBadgeText: { fontSize: 11, fontFamily: F.bold },
-  ptwNum: { fontSize: 11.5, fontFamily: F.bold, color: C.sec, marginBottom: 4, fontFamily: 'monospace' },
+  ptwNum: { fontSize: 11.5, fontFamily: 'monospace', color: C.sec, marginBottom: 4 },
   title: { fontSize: 14.5, fontFamily: F.bold, color: C.ink, lineHeight: 20, marginBottom: 10 },
   metaRow: { flexDirection: 'row', gap: 16, marginBottom: 10 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
