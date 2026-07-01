@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import { C, GradientHeaders } from '@/theme/colors';
 import { F } from '@/theme/typography';
 import { getProfile } from '@/data/chatData';
+import { useChatStore } from '@/context/ChatContext';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/types';
@@ -18,6 +19,9 @@ export default function ChatProfileScreen() {
   const { params } = useRoute<Rt>();
   const insets = useSafeAreaInsets();
   const profile = getProfile(params.name);
+  const { conversations, blockContact } = useChatStore();
+  const conversation = conversations.find((c) => c.id === params.contactId);
+  const blocked = !!conversation?.blocked;
 
   return (
     <View style={styles.container}>
@@ -47,6 +51,11 @@ export default function ChatProfileScreen() {
           </View>
           <Text style={styles.name}>{params.name}</Text>
           <Text style={styles.role}>{profile.role}</Text>
+          {profile.online ? (
+            <Text style={styles.presence}>online</Text>
+          ) : profile.lastSeen ? (
+            <Text style={styles.presence}>{profile.lastSeen}</Text>
+          ) : null}
         </View>
 
         {profile.bio ? (
@@ -86,6 +95,18 @@ export default function ChatProfileScreen() {
             </View>
           </View>
         )}
+
+        {!profile.isGroup && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.blockRow}
+              onPress={() => conversation && blockContact(conversation.id)}
+            >
+              <Icon name="ban" size={18} color={C.danger} />
+              <Text style={styles.blockText}>{blocked ? 'Buka Blokir Kontak' : 'Blokir Kontak'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -122,6 +143,7 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 30, fontFamily: F.extraBold, color: '#fff' },
   name: { fontSize: 19, fontFamily: F.extraBold, color: C.ink },
   role: { fontSize: 13.5, color: C.sec, fontFamily: F.medium },
+  presence: { fontSize: 12.5, color: C.mut, fontFamily: F.medium, marginTop: 2 },
   section: {
     marginHorizontal: 18,
     marginTop: 14,
@@ -138,4 +160,6 @@ const styles = StyleSheet.create({
   infoBody: { flex: 1 },
   infoLabel: { fontSize: 11.5, color: C.mut, fontFamily: F.medium },
   infoValue: { fontSize: 14, color: C.ink, fontFamily: F.regular, marginTop: 2 },
+  blockRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  blockText: { fontSize: 14, fontFamily: F.medium, color: C.danger },
 });
