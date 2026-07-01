@@ -5,14 +5,19 @@ import { C, GradientHeaders } from '@/theme/colors';
 import { F } from '@/theme/typography';
 import GradientHeader from '@/components/GradientHeader';
 import { CONTACTS } from '@/data/chatData';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/types';
+import { useChatStore } from '@/context/ChatContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Rt = RouteProp<RootStackParamList, 'ChatContactPicker'>;
 
 export default function ChatContactPickerScreen() {
   const navigation = useNavigation<Nav>();
+  const { params } = useRoute<Rt>();
+  const { forwardMessage } = useChatStore();
+  const isForwarding = !!params?.forwardMessage;
   const [search, setSearch] = useState('');
   const searchQ = search.trim().toLowerCase();
   const filtered = CONTACTS.filter((c) => c.name.toLowerCase().includes(searchQ));
@@ -20,7 +25,7 @@ export default function ChatContactPickerScreen() {
   return (
     <View style={styles.container}>
       <GradientHeader
-        title="Chat Baru"
+        title={isForwarding ? 'Teruskan Pesan' : 'Chat Baru'}
         colors={GradientHeaders.chat as [string, string]}
         onBack={() => navigation.goBack()}
         subtitle={
@@ -50,13 +55,22 @@ export default function ChatContactPickerScreen() {
             key={c.id}
             style={[styles.row, i < filtered.length - 1 && styles.rowBorder]}
             activeOpacity={0.7}
-            onPress={() =>
-              navigation.replace('ChatConversation', {
-                contactId: c.id,
-                name: c.name,
-                color: c.color,
-              })
-            }
+            onPress={() => {
+              if (isForwarding && params?.forwardMessage) {
+                forwardMessage(params.forwardMessage, c.id);
+                navigation.navigate('ChatConversation', {
+                  contactId: c.id,
+                  name: c.name,
+                  color: c.color,
+                });
+              } else {
+                navigation.replace('ChatConversation', {
+                  contactId: c.id,
+                  name: c.name,
+                  color: c.color,
+                });
+              }
+            }}
           >
             <View style={[styles.avatar, { backgroundColor: c.color }]}>
               <Text style={styles.avatarText}>

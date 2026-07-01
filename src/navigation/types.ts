@@ -1,3 +1,5 @@
+import { ChatMessage } from '@/data/chatData';
+
 export type RootStackParamList = {
   MainTabs: undefined;
   CaseIncident: undefined;
@@ -11,7 +13,7 @@ export type RootStackParamList = {
   SettingsFull: undefined;
   MasterData: undefined;
   Chat: undefined;
-  ChatContactPicker: undefined;
+  ChatContactPicker: { forwardMessage?: ChatMessage } | undefined;
   ChatConversation: { contactId: string; name: string; color: string };
   ChatProfile: { contactId: string; name: string; color: string };
   ChatArchived: undefined;
