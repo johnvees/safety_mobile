@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
 import Icon from '@/components/Icon';
 import ChatBubble from '@/components/ChatBubble';
 import { C, GradientHeaders } from '@/theme/colors';
@@ -49,9 +50,21 @@ export default function ChatConversationScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pulseId, setPulseId] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const messagePositions = useRef<Record<string, number>>({});
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const blocked = !!conversation?.blocked;
+
+  function jumpToMessage(id: string) {
+    const y = messagePositions.current[id];
+    if (y === undefined) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 40), animated: true });
+    Haptics.selectionAsync();
+    setPulseId(id);
+    setTimeout(() => setPulseId(null), 900);
+  }
 
   useEffect(() => {
     return () => {
@@ -81,6 +94,7 @@ export default function ChatConversationScreen() {
   }
 
   function startReply(msg: ChatMessage) {
+    Haptics.selectionAsync();
     setReplyingTo({
       id: msg.id,
       senderName: msg.isMe ? 'Anda' : params.name,
@@ -257,6 +271,7 @@ export default function ChatConversationScreen() {
       </LinearGradient>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -272,7 +287,12 @@ export default function ChatConversationScreen() {
             const dayKey = m.dayKey;
             const showSeparator = !!dayKey && dayKey !== prevDayKey;
             return (
-              <React.Fragment key={m.id}>
+              <View
+                key={m.id}
+                onLayout={(e) => {
+                  messagePositions.current[m.id] = e.nativeEvent.layout.y;
+                }}
+              >
                 {showSeparator && (
                   <View style={styles.dateSeparatorWrap}>
                     <Text style={styles.dateSeparatorText}>{formatDateSeparator(dayKey!)}</Text>
@@ -288,10 +308,12 @@ export default function ChatConversationScreen() {
                   replyTo={m.replyTo}
                   status={m.status}
                   starred={m.starred}
+                  pulse={pulseId === m.id}
                   onLongPress={!m.deleted ? () => setActionSheetMsg(m) : undefined}
                   onSwipeReply={!m.deleted ? () => startReply(m) : undefined}
+                  onReplyPress={m.replyTo ? () => jumpToMessage(m.replyTo!.id) : undefined}
                 />
-              </React.Fragment>
+              </View>
             );
           })
         )}

@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Animated, View, Text, Image, StyleSheet, TouchableOpacity, PanResponder } from 'react-native';
 import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
 import Icon from '@/components/Icon';
 import { C } from '@/theme/colors';
 import { F } from '@/theme/typography';
@@ -22,8 +23,10 @@ interface Props {
   replyTo?: ChatReplyRef;
   status?: 'sent' | 'delivered' | 'read';
   starred?: boolean;
+  pulse?: boolean;
   onLongPress?: () => void;
   onSwipeReply?: () => void;
+  onReplyPress?: () => void;
 }
 
 export default function ChatBubble({
@@ -36,13 +39,26 @@ export default function ChatBubble({
   replyTo,
   status,
   starred,
+  pulse,
   onLongPress,
   onSwipeReply,
+  onReplyPress,
 }: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
   const [viewerMedia, setViewerMedia] = useState<{ type: 'image' | 'video'; uri: string } | null>(null);
   const [viewerPdf, setViewerPdf] = useState<{ uri: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!pulse) return;
+    Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: 250, useNativeDriver: false }),
+      Animated.timing(pulseAnim, { toValue: 0, duration: 650, useNativeDriver: false }),
+    ]).start();
+  }, [pulse]);
+
+  const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] });
 
   async function openFile(a: ChatAttachment) {
     if (a.mimeType === 'application/pdf') {
@@ -65,7 +81,10 @@ export default function ChatBubble({
         iconOpacity.setValue(clamped / SWIPE_MAX);
       },
       onPanResponderRelease: (_, g) => {
-        if (g.dx >= SWIPE_TRIGGER) onSwipeReply?.();
+        if (g.dx >= SWIPE_TRIGGER) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onSwipeReply?.();
+        }
         Animated.parallel([
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 120, friction: 14 }),
           Animated.timing(iconOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
@@ -85,12 +104,22 @@ export default function ChatBubble({
         />
       </Animated.View>
       <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
-      <TouchableOpacity
-        activeOpacity={onLongPress ? 0.7 : 1}
-        onLongPress={onLongPress}
-        disabled={!onLongPress}
-        style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}
-      >
+      <View style={styles.bubbleStack}>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.pulseGlow, { opacity: pulseOpacity }]}
+        />
+        <TouchableOpacity
+          activeOpacity={onLongPress ? 0.7 : 1}
+          onLongPress={() => {
+            if (onLongPress) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onLongPress();
+            }
+          }}
+          disabled={!onLongPress}
+          style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}
+        >
         {deleted ? (
           <View style={styles.deletedRow}>
             <Icon name="x-circle" size={14} color={isMe ? 'rgba(255,255,255,0.7)' : C.mut} />
@@ -101,7 +130,12 @@ export default function ChatBubble({
         ) : (
           <>
             {replyTo && (
-              <View style={[styles.replyBlock, { borderLeftColor: isMe ? '#fff' : C.teal }]}>
+              <TouchableOpacity
+                activeOpacity={onReplyPress ? 0.6 : 1}
+                disabled={!onReplyPress}
+                onPress={onReplyPress}
+                style={[styles.replyBlock, { borderLeftColor: isMe ? '#fff' : C.teal }]}
+              >
                 <Text
                   style={[styles.replyName, { color: isMe ? '#fff' : C.teal }]}
                   numberOfLines={1}
@@ -114,7 +148,7 @@ export default function ChatBubble({
                 >
                   {replyTo.text}
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
             {attachments.length > 0 && (
               <View style={styles.attachments}>
@@ -161,7 +195,8 @@ export default function ChatBubble({
             ) : null}
           </>
         )}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
       </Animated.View>
       <View style={styles.metaRow}>
         {starred && !deleted ? <Icon name="star" size={10} color={C.warn} /> : null}
@@ -211,6 +246,16 @@ const styles = StyleSheet.create({
   },
   wrapMe: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   wrapOther: { alignSelf: 'flex-start', alignItems: 'flex-start' },
+  bubbleStack: { position: 'relative' },
+  pulseGlow: {
+    position: 'absolute',
+    top: -6,
+    left: -6,
+    right: -6,
+    bottom: -6,
+    borderRadius: 22,
+    backgroundColor: C.amber100,
+  },
   bubble: {
     paddingHorizontal: 14,
     paddingVertical: 10,
