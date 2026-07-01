@@ -75,6 +75,12 @@ import {
   IconFile,
   IconUpload,
   IconArchive,
+  IconMicrophone,
+  IconPin,
+  IconPlayerPause,
+  IconChecks,
+  IconCornerUpRight,
+  IconBan,
 } from '@tabler/icons-react-native';
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -153,6 +159,12 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   file: IconFile,
   upload: IconUpload,
   archive: IconArchive,
+  mic: IconMicrophone,
+  pin: IconPin,
+  'pause-circle': IconPlayerPause,
+  checks: IconChecks,
+  'corner-up-right': IconCornerUpRight,
+  ban: IconBan,
 };
 
 interface Props {
