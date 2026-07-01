@@ -39,6 +39,7 @@ export interface Conversation {
   deletedAt?: string;
   pinned?: boolean;
   muted?: boolean;
+  blocked?: boolean;
   messages: ChatMessage[];
 }
 
@@ -150,7 +151,6 @@ export interface ChatProfile {
   isGroup: boolean;
   online?: boolean;
   lastSeen?: string;
-  blocked?: boolean;
 }
 
 const DEFAULT_PROFILE: ChatProfile = {
