@@ -2,9 +2,10 @@ import { C } from '@/theme/colors';
 
 export interface ChatAttachment {
   id: string;
-  type: 'image' | 'video' | 'file';
+  type: 'image' | 'video' | 'file' | 'audio';
   uri: string;
   name: string;
+  duration?: number; // seconds, audio only
 }
 
 export interface ChatReplyRef {
@@ -18,10 +19,13 @@ export interface ChatMessage {
   text: string;
   isMe: boolean;
   time: string;
+  dayKey?: string;
   attachments?: ChatAttachment[];
   edited?: boolean;
   deleted?: boolean;
   replyTo?: ChatReplyRef;
+  status?: 'sent' | 'delivered' | 'read';
+  starred?: boolean;
 }
 
 export interface Conversation {
@@ -33,15 +37,39 @@ export interface Conversation {
   color: string;
   archived: boolean;
   deletedAt?: string;
+  pinned?: boolean;
+  muted?: boolean;
   messages: ChatMessage[];
 }
 
 export const TRASH_RETENTION_DAYS = 30;
+const TODAY_KEY = new Date().toDateString();
+const YESTERDAY_KEY = new Date(Date.now() - 86400000).toDateString();
 
 export function daysRemaining(deletedAt: string): number {
   const elapsedMs = Date.now() - new Date(deletedAt).getTime();
   const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
   return Math.max(0, TRASH_RETENTION_DAYS - elapsedDays);
+}
+
+export function nowTime(): string {
+  return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function formatDateSeparator(dayKey: string): string {
+  const today = new Date();
+  const todayKey = today.toDateString();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayKey = yesterday.toDateString();
+
+  if (dayKey === todayKey) return 'Hari ini';
+  if (dayKey === yesterdayKey) return 'Kemarin';
+  return new Date(dayKey).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 export const CONVERSATIONS: Conversation[] = [
@@ -54,8 +82,8 @@ export const CONVERSATIONS: Conversation[] = [
     color: C.teal,
     archived: false,
     messages: [
-      { id: 'm1', text: 'Selamat pagi, mohon update laporan inspeksi.', isMe: false, time: '09:00' },
-      { id: 'm2', text: 'Mohon segera lengkapi laporan inspeksi minggu ini.', isMe: false, time: '09:12' },
+      { id: 'm1', text: 'Selamat pagi, mohon update laporan inspeksi.', isMe: false, time: '09:00', dayKey: TODAY_KEY },
+      { id: 'm2', text: 'Mohon segera lengkapi laporan inspeksi minggu ini.', isMe: false, time: '09:12', dayKey: TODAY_KEY },
     ],
   },
   {
@@ -67,8 +95,8 @@ export const CONVERSATIONS: Conversation[] = [
     color: C.ok,
     archived: false,
     messages: [
-      { id: 'm1', text: 'Pak, dokumen JSA sudah siap.', isMe: false, time: '08:40' },
-      { id: 'm2', text: 'Sudah saya upload dokumen JSA-nya pak.', isMe: false, time: '08:45' },
+      { id: 'm1', text: 'Pak, dokumen JSA sudah siap.', isMe: false, time: '08:40', dayKey: TODAY_KEY },
+      { id: 'm2', text: 'Sudah saya upload dokumen JSA-nya pak.', isMe: false, time: '08:45', dayKey: TODAY_KEY },
     ],
   },
   {
@@ -80,8 +108,8 @@ export const CONVERSATIONS: Conversation[] = [
     color: C.warn,
     archived: false,
     messages: [
-      { id: 'm1', text: 'Baik, dikonfirmasi ya untuk jadwal besok.', isMe: true, time: 'Kemarin' },
-      { id: 'm2', text: 'Terima kasih konfirmasinya.', isMe: false, time: 'Kemarin' },
+      { id: 'm1', text: 'Baik, dikonfirmasi ya untuk jadwal besok.', isMe: true, time: 'Kemarin', dayKey: YESTERDAY_KEY },
+      { id: 'm2', text: 'Terima kasih konfirmasinya.', isMe: false, time: 'Kemarin', dayKey: YESTERDAY_KEY },
     ],
   },
   {
@@ -93,7 +121,7 @@ export const CONVERSATIONS: Conversation[] = [
     color: C.violet,
     archived: false,
     messages: [
-      { id: 'm1', text: 'Jadwal inspeksi besok pindah jadi jam 08.00.', isMe: false, time: 'Kemarin' },
+      { id: 'm1', text: 'Jadwal inspeksi besok pindah jadi jam 08.00.', isMe: false, time: 'Kemarin', dayKey: YESTERDAY_KEY },
     ],
   },
 ];
@@ -120,6 +148,9 @@ export interface ChatProfile {
   email: string;
   bio: string;
   isGroup: boolean;
+  online?: boolean;
+  lastSeen?: string;
+  blocked?: boolean;
 }
 
 const DEFAULT_PROFILE: ChatProfile = {
@@ -144,6 +175,7 @@ export const PROFILES: Record<string, ChatProfile> = {
     email: 'budi.santoso@cpin.co.id',
     bio: 'Bertanggung jawab atas inspeksi harian area produksi.',
     isGroup: false,
+    online: true,
   },
   'Koordinator K3 Area B': {
     role: 'Koordinator K3',
@@ -165,6 +197,7 @@ export const PROFILES: Record<string, ChatProfile> = {
     email: 'siti.rahayu@cpin.co.id',
     bio: 'Menangani dokumentasi dan pelaporan HSE.',
     isGroup: false,
+    lastSeen: 'terakhir dilihat 10 menit lalu',
   },
   'Ahmad Wijaya': {
     role: 'Supervisor Lapangan',
@@ -172,6 +205,7 @@ export const PROFILES: Record<string, ChatProfile> = {
     email: 'ahmad.wijaya@cpin.co.id',
     bio: 'Supervisor lapangan untuk operasional harian.',
     isGroup: false,
+    lastSeen: 'terakhir dilihat kemarin pukul 20.15',
   },
 };
 
