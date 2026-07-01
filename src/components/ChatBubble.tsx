@@ -4,6 +4,7 @@ import Icon from '@/components/Icon';
 import { C } from '@/theme/colors';
 import { F } from '@/theme/typography';
 import { ChatAttachment, ChatReplyRef } from '@/data/chatData';
+import VoiceMessage from '@/components/VoiceMessage';
 
 const SWIPE_MAX = 60;
 const SWIPE_TRIGGER = 44;
@@ -16,6 +17,8 @@ interface Props {
   edited?: boolean;
   deleted?: boolean;
   replyTo?: ChatReplyRef;
+  status?: 'sent' | 'delivered' | 'read';
+  starred?: boolean;
   onLongPress?: () => void;
   onSwipeReply?: () => void;
 }
@@ -28,6 +31,8 @@ export default function ChatBubble({
   edited,
   deleted,
   replyTo,
+  status,
+  starred,
   onLongPress,
   onSwipeReply,
 }: Props) {
@@ -98,7 +103,9 @@ export default function ChatBubble({
             {attachments.length > 0 && (
               <View style={styles.attachments}>
                 {attachments.map((a) =>
-                  a.type === 'file' ? (
+                  a.type === 'audio' ? (
+                    <VoiceMessage key={a.id} uri={a.uri} duration={a.duration} isMe={isMe} />
+                  ) : a.type === 'file' ? (
                     <View key={a.id} style={styles.fileChip}>
                       <Icon name="file-text" size={16} color={isMe ? '#fff' : C.ink} />
                       <Text
@@ -131,8 +138,16 @@ export default function ChatBubble({
       </TouchableOpacity>
       </Animated.View>
       <View style={styles.metaRow}>
+        {starred && !deleted ? <Icon name="star" size={10} color={C.warn} /> : null}
         {edited && !deleted ? <Text style={styles.editedTag}>diedit</Text> : null}
         {timestamp ? <Text style={styles.time}>{timestamp}</Text> : null}
+        {isMe && !deleted && status ? (
+          <Icon
+            name={status === 'sent' ? 'check' : 'checks'}
+            size={13}
+            color={status === 'read' ? '#34B7F1' : C.mut}
+          />
+        ) : null}
       </View>
     </View>
   );

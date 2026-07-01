@@ -16,6 +16,7 @@
     "@react-navigation/native-stack": "^6.9.26",
     "@tabler/icons-react-native": "^3.44.0",
     "expo": "^54.0.0",
+    "expo-audio": "~1.1.1",
     "expo-document-picker": "~14.0.8",
     "expo-font": "~14.0.12",
     "expo-image-picker": "~17.0.11",
