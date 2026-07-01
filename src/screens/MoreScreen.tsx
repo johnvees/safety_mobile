@@ -18,7 +18,6 @@ export default function MoreScreen() {
   const initials = currentUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
   const MODUL = [
-    { icon: 'message-circle', label: 'Chat / Komunikasi HSE', badge: 3, onPress: () => {} },
     { icon: 'bar-chart-2', label: 'Laporan & Analitik', badge: 0, onPress: () => navigation.navigate('DashboardFull') },
     { icon: 'calendar', label: 'Jadwal Inspeksi', badge: 0, onPress: () => navigation.navigate('InspeksiList') },
   ];

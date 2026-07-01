@@ -12,12 +12,30 @@ export type RootStackParamList = {
   MasterData: undefined;
   Chat: undefined;
   HseModuleBuat: { moduleType: 'SoP' | 'WI' | 'Form' | 'Edukasi' };
-  HseModulDetail: { id: string; title: string; cat: string; module: string; updated: string };
+  HseModulDetail: {
+    id: string;
+    title: string;
+    cat: string;
+    module: string;
+    updated: string;
+    attachments?: { id: string; type: string; name: string }[];
+    deskripsi?: string;
+    poin?: { id: string; text: string }[];
+    onSave?: (updated: {
+      title: string;
+      cat: string;
+      attachments: { id: string; type: string; name: string }[];
+      deskripsi: string;
+      poin: { id: string; text: string }[];
+    }) => void;
+    onDelete?: () => void;
+  };
 };
 
 export type BottomTabParamList = {
   Home: undefined;
   Laporan: undefined;
   HSE: undefined;
+  Chat: undefined;
   More: undefined;
 };

@@ -33,6 +33,7 @@ export const GradientHeaders = {
   inspeksi: ['#16A34A', '#15803D'],
   permit: ['#D97706', '#B45309'],
   hse: ['#10b981', '#059669'],
+  chat: ['#8B5CF6', '#6D28D9'],
   more: ['#0F172A', '#1E293B'],
 };
 

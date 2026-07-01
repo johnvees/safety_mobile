@@ -5,6 +5,7 @@ import {
   IconHome,
   IconReport,
   IconFolder,
+  IconMessageCircle,
   IconDots,
 } from '@tabler/icons-react-native';
 import { C } from '@/theme/colors';
@@ -14,6 +15,7 @@ import { BottomTabParamList } from './types';
 import HomeScreen from '@/screens/HomeScreen';
 import LaporanScreen from '@/screens/LaporanScreen';
 import HseScreen from '@/screens/HseScreen';
+import ChatScreen from '@/screens/ChatScreen';
 import MoreScreen from '@/screens/MoreScreen';
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
@@ -22,6 +24,7 @@ const TAB_ICONS: Record<string, React.ComponentType<any>> = {
   Home: IconHome,
   Laporan: IconReport,
   HSE: IconFolder,
+  Chat: IconMessageCircle,
   More: IconDots,
 };
 
@@ -63,6 +66,15 @@ export default function BottomTabs() {
       />
       <Tab.Screen name="Laporan" component={LaporanScreen} />
       <Tab.Screen name="HSE" component={HseScreen} />
+      <Tab.Screen
+        name="Chat"
+        component={ChatScreen}
+        options={{
+          tabBarLabel: 'Chat',
+          tabBarBadge: 3,
+          tabBarBadgeStyle: { backgroundColor: C.danger, fontFamily: F.bold, fontSize: 10 },
+        }}
+      />
       <Tab.Screen
         name="More"
         component={MoreScreen}

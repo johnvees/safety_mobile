@@ -1,25 +1,20 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Platform,
-  KeyboardAvoidingView,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Platform, KeyboardAvoidingView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@/components/Icon';
+import HseEditModuleModal from '@/components/HseEditModuleModal';
 import { C } from '@/theme/colors';
-import { F } from '@/theme/typography';
 import { RootStackParamList } from '@/navigation/types';
+import { MODULE_META } from '@/constants/hseJenis';
+import { Attachment } from '@/data/hseDocs';
+import { styles } from './HseModulDetailScreen.styles';
 
 type RouteP = RouteProp<RootStackParamList, 'HseModulDetail'>;
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Poin = { id: string; text: string };
 
 const CAT_COLORS: Record<string, { bg: string; text: string }> = {
   K3: { bg: C.red100, text: C.danger },
@@ -40,27 +35,48 @@ const DUMMY_COMMENTS = [
   { id: '3', name: 'Rudi Hartono', initials: 'RH', time: '45m', text: 'Apakah ada revisi terbaru untuk prosedur ini?' },
 ];
 
-const DUMMY_FILES = [
-  { id: '1', name: 'Lampiran_Prosedur_Utama.pdf', size: '2.4 MB', icon: 'file-text' },
-  { id: '2', name: 'Diagram_Alur_Kerja.png', size: '840 KB', icon: 'image' },
+const DUMMY_FILES: Attachment[] = [
+  { id: '1', type: 'file', name: 'Lampiran_Prosedur_Utama.pdf' },
+  { id: '2', type: 'image', name: 'Diagram_Alur_Kerja.png' },
 ];
 
 export default function HseModulDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteP>();
   const insets = useSafeAreaInsets();
-  const { title, cat, module: moduleType, updated } = route.params;
+  const { title, cat, module: moduleType, updated, attachments, deskripsi, poin, onSave, onDelete } = route.params;
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(48);
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState(DUMMY_COMMENTS);
 
-  const catStyle = CAT_COLORS[cat] ?? { bg: C.surface, text: C.sec };
+  const [docTitle, setDocTitle] = useState(title);
+  const [docCat, setDocCat] = useState(cat);
+  const [docAttachments, setDocAttachments] = useState<Attachment[]>(
+    attachments && attachments.length > 0 ? attachments : DUMMY_FILES,
+  );
+  const [docDeskripsi, setDocDeskripsi] = useState(deskripsi ?? MODULE_DESC[moduleType] ?? '');
+  const [docPoin, setDocPoin] = useState<Poin[]>(poin && poin.length > 0 ? poin : []);
+
+  const [editOpen, setEditOpen] = useState(false);
+
+  const catStyle = CAT_COLORS[docCat] ?? { bg: C.surface, text: C.sec };
+  const meta = MODULE_META[moduleType] ?? MODULE_META['SoP'];
   const isEdukasi = moduleType === 'Edukasi';
   const isForm = moduleType === 'Form';
   const hasVideo = isEdukasi;
   const hasFiles = isForm || moduleType === 'SoP' || moduleType === 'WI';
+
+  function handleEditSave(updated: { title: string; cat: string; attachments: Attachment[]; deskripsi: string; poin: Poin[] }) {
+    setDocTitle(updated.title);
+    setDocCat(updated.cat);
+    setDocAttachments(updated.attachments);
+    setDocDeskripsi(updated.deskripsi);
+    setDocPoin(updated.poin);
+    onSave?.(updated);
+    setEditOpen(false);
+  }
 
   function handleLike() {
     setLiked((v) => !v);
@@ -94,12 +110,44 @@ export default function HseModulDetailScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {moduleType}
         </Text>
-        <TouchableOpacity
-          style={styles.shareBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Icon name="share" size={18} color={C.sec} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {onSave && (
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setEditOpen(true)}
+            >
+              <Icon name="edit-2" size={18} color={C.sec} />
+            </TouchableOpacity>
+          )}
+          {onDelete && (
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => {
+                Alert.alert('Hapus modul?', docTitle, [
+                  { text: 'Batal', style: 'cancel' },
+                  {
+                    text: 'Hapus',
+                    style: 'destructive',
+                    onPress: () => {
+                      onDelete?.();
+                      navigation.goBack();
+                    },
+                  },
+                ]);
+              }}
+            >
+              <Icon name="trash" size={18} color={C.danger} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.shareBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon name="share" size={18} color={C.sec} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -152,10 +200,10 @@ export default function HseModulDetailScreen() {
         <View style={styles.content}>
           {/* Cat badge + title */}
           <View style={[styles.catBadge, { backgroundColor: catStyle.bg }]}>
-            <Text style={[styles.catBadgeText, { color: catStyle.text }]}>{cat}</Text>
+            <Text style={[styles.catBadgeText, { color: catStyle.text }]}>{docCat}</Text>
           </View>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.desc}>{MODULE_DESC[moduleType] ?? ''}</Text>
+          <Text style={styles.title}>{docTitle}</Text>
+          <Text style={styles.desc}>{docDeskripsi}</Text>
           <Text style={styles.updatedText}>Diperbarui {updated}</Text>
 
           {/* Like / Comment buttons */}
@@ -180,17 +228,39 @@ export default function HseModulDetailScreen() {
           {hasFiles && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Lampiran</Text>
-              {DUMMY_FILES.map((f) => (
-                <TouchableOpacity key={f.id} style={styles.fileRow} activeOpacity={0.7}>
-                  <View style={styles.fileIcon}>
-                    <Icon name={f.icon} size={18} color={C.teal} />
+              {docAttachments.length === 0 ? (
+                <Text style={styles.fileSize}>Belum ada lampiran</Text>
+              ) : (
+                docAttachments.map((f) => (
+                  <TouchableOpacity key={f.id} style={styles.fileRow} activeOpacity={0.7}>
+                    <View style={styles.fileIcon}>
+                      <Icon
+                        name={f.type === 'image' ? 'image' : f.type === 'film' ? 'film' : 'file-text'}
+                        size={18}
+                        color={C.teal}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.fileName} numberOfLines={1}>{f.name}</Text>
+                    </View>
+                    <Icon name="download" size={16} color={C.mut} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
+
+          {/* Poin Penting */}
+          {docPoin.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Poin Penting</Text>
+              {docPoin.map((p, i) => (
+                <View key={p.id} style={styles.poinViewRow}>
+                  <View style={[styles.poinViewBullet, { backgroundColor: meta.color }]}>
+                    <Text style={styles.poinViewBulletText}>{i + 1}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.fileName} numberOfLines={1}>{f.name}</Text>
-                    <Text style={styles.fileSize}>{f.size}</Text>
-                  </View>
-                  <Icon name="download" size={16} color={C.mut} />
-                </TouchableOpacity>
+                  <Text style={styles.poinViewText}>{p.text}</Text>
+                </View>
               ))}
             </View>
           )}
@@ -238,185 +308,20 @@ export default function HseModulDetailScreen() {
           <Icon name="send" size={16} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      <HseEditModuleModal
+        visible={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={handleEditSave}
+        title={docTitle}
+        cat={docCat}
+        attachments={docAttachments}
+        deskripsi={docDeskripsi}
+        poin={docPoin}
+        moduleType={moduleType}
+        color={meta.color}
+        tint={meta.tint}
+      />
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingBottom: 14,
-    backgroundColor: C.white,
-    borderBottomWidth: 1,
-    borderBottomColor: C.line,
-    gap: 10,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: C.surface,
-  },
-  headerTitle: { flex: 1, fontSize: 17, fontFamily: F.bold, color: C.ink },
-  shareBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Video
-  videoContainer: { width: '100%', height: 220, overflow: 'hidden' },
-  videoGradient: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  stripeOverlay: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
-  stripe: {
-    position: 'absolute',
-    left: -200,
-    right: -200,
-    height: 18,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    transform: [{ rotate: '-35deg' }],
-  },
-  playBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 4,
-  },
-  durationBadge: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  durationText: { fontSize: 12, fontFamily: F.bold, color: '#fff' },
-
-  // File banner
-  fileBanner: {
-    height: 160,
-    backgroundColor: C.amber100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  fileBannerIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: C.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fileBannerLabel: { fontSize: 15, fontFamily: F.bold, color: C.warn },
-  fileBannerSub: { fontSize: 12, fontFamily: F.regular, color: C.warn700 },
-
-  // Doc banner
-  docBanner: { width: '100%', height: 160, overflow: 'hidden' },
-  docBannerGradient: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  docBannerText: { fontSize: 14, fontFamily: F.bold, color: 'rgba(255,255,255,0.7)', letterSpacing: 1 },
-
-  // Content
-  content: { padding: 20, gap: 12 },
-  catBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  catBadgeText: { fontSize: 13, fontFamily: F.semiBold },
-  title: { fontSize: 22, fontFamily: F.extraBold, color: C.ink, lineHeight: 30 },
-  desc: { fontSize: 14, fontFamily: F.regular, color: C.sec, lineHeight: 22 },
-  updatedText: { fontSize: 12, fontFamily: F.regular, color: C.mut },
-
-  // Actions
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 14,
-  },
-  actionText: { fontSize: 14, fontFamily: F.semiBold },
-
-  // Section
-  section: { gap: 10, marginTop: 6 },
-  sectionLabel: { fontSize: 15, fontFamily: F.bold, color: C.ink },
-
-  // Files
-  fileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: C.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.line,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  fileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: C.teal100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fileName: { fontSize: 13, fontFamily: F.semiBold, color: C.ink },
-  fileSize: { fontSize: 11, fontFamily: F.regular, color: C.mut, marginTop: 2 },
-
-  // Comments
-  commentRow: { flexDirection: 'row', gap: 12, paddingVertical: 12 },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: C.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  avatarText: { fontSize: 12, fontFamily: F.bold, color: C.sec },
-  commentMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
-  commentName: { fontSize: 13, fontFamily: F.bold, color: C.ink },
-  commentTime: { fontSize: 12, fontFamily: F.regular, color: C.mut },
-  commentText: { fontSize: 13, fontFamily: F.regular, color: C.sec, lineHeight: 19 },
-  divider: { height: 1, backgroundColor: C.line, marginLeft: 50 },
-
-  // Input bar
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    backgroundColor: C.white,
-    borderTopWidth: 1,
-    borderTopColor: C.line,
-  },
-  commentInput: {
-    flex: 1,
-    height: 44,
-    backgroundColor: C.surface,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    fontSize: 14,
-    fontFamily: F.regular,
-    color: C.ink,
-  },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
