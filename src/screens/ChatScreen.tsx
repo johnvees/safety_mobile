@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import Icon from '@/components/Icon';
 import { C, GradientHeaders } from '@/theme/colors';
 import { F } from '@/theme/typography';
@@ -7,6 +7,7 @@ import GradientHeader from '@/components/GradientHeader';
 import ChatFabMenu from '@/components/ChatFabMenu';
 import SwipeableRow from '@/components/SwipeableRow';
 import { useChatStore } from '@/context/ChatContext';
+import { Conversation } from '@/data/chatData';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/types';
@@ -16,12 +17,13 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export default function ChatScreen() {
   const navigation = useNavigation<Nav>();
   const [search, setSearch] = useState('');
-  const { conversations, archiveChat, softDeleteChat } = useChatStore();
+  const { conversations, archiveChat, softDeleteChat, pinChat, muteChat } = useChatStore();
+  const [actionSheetChat, setActionSheetChat] = useState<Conversation | null>(null);
   const searchQ = search.trim().toLowerCase();
   const archivedList = conversations.filter((c) => c.archived && !c.deletedAt);
-  const filtered = conversations.filter(
-    (c) => !c.archived && !c.deletedAt && c.name.toLowerCase().includes(searchQ),
-  );
+  const filtered = conversations
+    .filter((c) => !c.archived && !c.deletedAt && c.name.toLowerCase().includes(searchQ))
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   function deleteChat(id: string) {
     Alert.alert('Hapus Percakapan', 'Percakapan akan dipindahkan ke Pesan Terhapus.', [
@@ -93,6 +95,7 @@ export default function ChatScreen() {
               <TouchableOpacity
                 style={[styles.row, i < filtered.length - 1 && styles.rowBorder]}
                 activeOpacity={0.7}
+                onLongPress={() => setActionSheetChat(c)}
                 onPress={() =>
                   navigation.navigate('ChatConversation', {
                     contactId: c.id,
@@ -107,7 +110,11 @@ export default function ChatScreen() {
                   </Text>
                 </View>
                 <View style={styles.body}>
-                  <Text style={styles.name} numberOfLines={1}>{c.name}</Text>
+                  <View style={styles.nameRow}>
+                    {c.pinned && <Icon name="pin" size={12} color={C.mut} />}
+                    <Text style={styles.name} numberOfLines={1}>{c.name}</Text>
+                    {c.muted && <Icon name="bell-off" size={12} color={C.mut} />}
+                  </View>
                   <Text style={styles.lastMsg} numberOfLines={1}>{c.lastMessage}</Text>
                 </View>
                 <View style={styles.meta}>
@@ -125,6 +132,72 @@ export default function ChatScreen() {
       </ScrollView>
 
       <ChatFabMenu />
+
+      <Modal visible={!!actionSheetChat} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setActionSheetChat(null)}
+        >
+          <View style={styles.sheet}>
+            <TouchableOpacity
+              style={styles.sheetOption}
+              onPress={() => {
+                if (actionSheetChat) pinChat(actionSheetChat.id);
+                setActionSheetChat(null);
+              }}
+            >
+              <View style={[styles.sheetIconWrap, { backgroundColor: C.teal100 }]}>
+                <Icon name="pin" size={20} color={C.teal} />
+              </View>
+              <Text style={styles.sheetLabel}>
+                {actionSheetChat?.pinned ? 'Lepas Sematan' : 'Sematkan Percakapan'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sheetOption}
+              onPress={() => {
+                if (actionSheetChat) muteChat(actionSheetChat.id);
+                setActionSheetChat(null);
+              }}
+            >
+              <View style={[styles.sheetIconWrap, { backgroundColor: C.teal100 }]}>
+                <Icon name="bell-off" size={20} color={C.teal} />
+              </View>
+              <Text style={styles.sheetLabel}>
+                {actionSheetChat?.muted ? 'Aktifkan Notifikasi' : 'Bisukan Notifikasi'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sheetOption}
+              onPress={() => {
+                if (actionSheetChat) archiveChat(actionSheetChat.id);
+                setActionSheetChat(null);
+              }}
+            >
+              <View style={[styles.sheetIconWrap, { backgroundColor: C.teal100 }]}>
+                <Icon name="archive" size={20} color={C.teal} />
+              </View>
+              <Text style={styles.sheetLabel}>Arsipkan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sheetOption}
+              onPress={() => {
+                if (actionSheetChat) deleteChat(actionSheetChat.id);
+                setActionSheetChat(null);
+              }}
+            >
+              <View style={[styles.sheetIconWrap, { backgroundColor: C.red100 }]}>
+                <Icon name="trash" size={20} color={C.danger} />
+              </View>
+              <Text style={[styles.sheetLabel, { color: C.danger }]}>Hapus</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetCancel} onPress={() => setActionSheetChat(null)}>
+              <Text style={styles.sheetCancelText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -196,6 +269,7 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 15, fontFamily: F.extraBold, color: '#fff' },
   body: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: { fontSize: 14.5, fontFamily: F.bold, color: C.ink },
   lastMsg: { fontSize: 12.5, color: C.sec, marginTop: 2 },
   meta: { alignItems: 'flex-end', gap: 6 },
@@ -212,4 +286,29 @@ const styles = StyleSheet.create({
   unreadText: { fontSize: 11, fontFamily: F.extraBold, color: '#fff' },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyText: { fontSize: 14, color: C.mut, fontFamily: F.medium },
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 28,
+  },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+  },
+  sheetIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetLabel: { fontSize: 15, fontFamily: F.medium, color: C.ink },
+  sheetCancel: { alignItems: 'center', paddingVertical: 14, marginTop: 4 },
+  sheetCancelText: { fontSize: 15, fontFamily: F.bold, color: C.mut },
 });
