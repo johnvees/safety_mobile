@@ -37,6 +37,8 @@ export default function ChatScreen() {
       <GradientHeader
         title="Chat HSE"
         colors={GradientHeaders.chat as [string, string]}
+        rightIcon="bell"
+        onRight={() => navigation.navigate('Notifikasi')}
         subtitle={
           <View style={styles.headerSearch}>
             <View style={styles.headerSearchInput}>

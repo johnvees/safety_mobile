@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@/components/Icon';
-import { GradientHeaders } from '@/theme/colors';
+import { C, GradientHeaders } from '@/theme/colors';
 import { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -33,17 +33,17 @@ export default function ChatFabMenu() {
 }
 
 const styles = StyleSheet.create({
-  fab: { position: 'absolute', right: 18, zIndex: 20 },
+  fab: { position: 'absolute', overflow: 'hidden', right: 20, zIndex: 20 },
   fabGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowColor: C.violet,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    elevation: 8,
   },
 });
