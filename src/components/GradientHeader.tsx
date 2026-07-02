@@ -109,6 +109,8 @@ const styles = StyleSheet.create({
     fontFamily: F.bold,
     color: '#fff',
     lineHeight: 14,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
     textAlign: 'center',
   },
   subtitle: { marginTop: 8 },

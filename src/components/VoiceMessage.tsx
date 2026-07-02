@@ -41,27 +41,44 @@ export default function VoiceMessage({ uri, duration = 0, isMe }: Props) {
     }
   }
 
+  function seek(ratio: number) {
+    if (totalSeconds > 0) {
+      player.seekTo(ratio * totalSeconds);
+    }
+  }
+
   const accent = isMe ? '#fff' : C.teal;
   const track = isMe ? 'rgba(255,255,255,0.35)' : C.line;
 
   return (
-    <TouchableOpacity style={styles.wrap} onPress={toggle} activeOpacity={0.8}>
-      <View style={[styles.playBtn, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : C.teal100 }]}>
-        <Icon name={status.playing ? 'pause-circle' : 'play-circle'} size={22} color={accent} />
-      </View>
+    <View style={styles.wrap}>
+      <TouchableOpacity
+        style={[styles.playBtn, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : C.teal100 }]}
+        onPress={toggle}
+        activeOpacity={0.8}
+      >
+        <Icon name={status.playing ? 'pause-circle' : 'play-circle'} size={24} color={accent} />
+      </TouchableOpacity>
       <View style={styles.body}>
-        <WaveformBars levels={levels} progress={progress} activeColor={accent} mutedColor={track} height={22} />
+        <WaveformBars
+          levels={levels}
+          progress={progress}
+          activeColor={accent}
+          mutedColor={track}
+          height={26}
+          onSeek={seek}
+        />
         <Text style={[styles.time, { color: isMe ? 'rgba(255,255,255,0.85)' : C.mut }]}>
           {formatSeconds(status.playing || currentSeconds > 0 ? currentSeconds : totalSeconds)}
         </Text>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, paddingVertical: 2 },
-  playBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  body: { flex: 1, gap: 4 },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 210, paddingHorizontal: 2 },
+  playBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  body: { flex: 1, gap: 6, justifyContent: 'center' },
   time: { fontSize: 10.5, fontFamily: F.medium },
 });

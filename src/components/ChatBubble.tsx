@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Animated, View, Text, Image, StyleSheet, TouchableOpacity, PanResponder } from 'react-native';
+import { Animated, View, Text, Image, StyleSheet, TouchableOpacity, PanResponder, Platform } from 'react-native';
 import * as Sharing from 'expo-sharing';
+import * as IntentLauncher from 'expo-intent-launcher';
+import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import Icon from '@/components/Icon';
 import { C } from '@/theme/colors';
@@ -8,7 +10,8 @@ import { F } from '@/theme/typography';
 import { ChatAttachment, ChatReplyRef } from '@/data/chatData';
 import VoiceMessage from '@/components/VoiceMessage';
 import MediaViewerModal from '@/components/MediaViewerModal';
-import PdfViewerModal from '@/components/PdfViewerModal';
+
+const GRID_MAX = 4;
 
 const SWIPE_MAX = 60;
 const SWIPE_TRIGGER = 44;
@@ -47,8 +50,7 @@ export default function ChatBubble({
   const translateX = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
-  const [viewerMedia, setViewerMedia] = useState<{ type: 'image' | 'video'; uri: string } | null>(null);
-  const [viewerPdf, setViewerPdf] = useState<{ uri: string; name: string } | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!pulse) return;
@@ -65,13 +67,22 @@ export default function ChatBubble({
   const isMediaGrouped = mediaAttachments.length >= 4;
 
   async function openFile(a: ChatAttachment) {
-    if (a.mimeType === 'application/pdf') {
-      setViewerPdf({ uri: a.uri, name: a.name });
-      return;
+    if (Platform.OS === 'android') {
+      try {
+        const contentUri = new File(a.uri).contentUri;
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+          type: a.mimeType || '*/*',
+        });
+        return;
+      } catch {
+        // no app registered for this mime type — fall through to share sheet
+      }
     }
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
-      Sharing.shareAsync(a.uri, a.mimeType ? { mimeType: a.mimeType } : undefined);
+      Sharing.shareAsync(a.uri, a.mimeType ? { mimeType: a.mimeType, UTI: a.mimeType } : undefined);
     }
   }
 
@@ -158,29 +169,38 @@ export default function ChatBubble({
               <View style={styles.attachments}>
                 {isMediaGrouped ? (
                   <View style={styles.mediaGrid}>
-                    {mediaAttachments.map((a) => (
-                      <TouchableOpacity
-                        key={a.id}
-                        style={styles.mediaGridItem}
-                        activeOpacity={0.85}
-                        onPress={() => setViewerMedia({ type: a.type as 'image' | 'video', uri: a.uri })}
-                      >
-                        <Image source={{ uri: a.uri }} style={styles.mediaGridImage} />
-                        {a.type === 'video' && (
-                          <View style={styles.playOverlay}>
-                            <Icon name="play-circle" size={20} color="#fff" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+                    {mediaAttachments.slice(0, GRID_MAX).map((a, i) => {
+                      const remaining = mediaAttachments.length - GRID_MAX;
+                      const showMoreOverlay = i === GRID_MAX - 1 && remaining > 0;
+                      return (
+                        <TouchableOpacity
+                          key={a.id}
+                          style={styles.mediaGridItem}
+                          activeOpacity={0.85}
+                          onPress={() => setViewerIndex(i)}
+                        >
+                          <Image source={{ uri: a.uri }} style={styles.mediaGridImage} />
+                          {a.type === 'video' && !showMoreOverlay && (
+                            <View style={styles.playOverlay}>
+                              <Icon name="play-circle" size={20} color="#fff" />
+                            </View>
+                          )}
+                          {showMoreOverlay && (
+                            <View style={styles.moreOverlay}>
+                              <Text style={styles.moreOverlayText}>+{remaining}</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 ) : (
-                  mediaAttachments.map((a) => (
+                  mediaAttachments.map((a, i) => (
                     <TouchableOpacity
                       key={a.id}
                       style={styles.mediaWrap}
                       activeOpacity={0.85}
-                      onPress={() => setViewerMedia({ type: a.type as 'image' | 'video', uri: a.uri })}
+                      onPress={() => setViewerIndex(i)}
                     >
                       <Image source={{ uri: a.uri }} style={styles.mediaImage} />
                       {a.type === 'video' && (
@@ -235,20 +255,12 @@ export default function ChatBubble({
           />
         ) : null}
       </View>
-      {viewerMedia && (
+      {viewerIndex !== null && (
         <MediaViewerModal
           visible
-          type={viewerMedia.type}
-          uri={viewerMedia.uri}
-          onClose={() => setViewerMedia(null)}
-        />
-      )}
-      {viewerPdf && (
-        <PdfViewerModal
-          visible
-          uri={viewerPdf.uri}
-          name={viewerPdf.name}
-          onClose={() => setViewerPdf(null)}
+          items={mediaAttachments.map((a) => ({ type: a.type as 'image' | 'video', uri: a.uri }))}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
         />
       )}
     </View>
@@ -318,6 +330,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
   },
+  moreOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  moreOverlayText: { color: '#fff', fontSize: 20, fontFamily: F.extraBold },
   fileChip: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -11,6 +11,7 @@ import { Conversation } from '@/data/chatData';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/types';
+import { notifications } from '@/data/mockData';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -19,6 +20,7 @@ export default function ChatScreen() {
   const [search, setSearch] = useState('');
   const { conversations, archiveChat, softDeleteChat, pinChat, muteChat } = useChatStore();
   const [actionSheetChat, setActionSheetChat] = useState<Conversation | null>(null);
+  const unreadNotifCount = notifications.filter((n) => !n.read).length;
   const searchQ = search.trim().toLowerCase();
   const archivedList = conversations.filter((c) => c.archived && !c.deletedAt);
   const filtered = conversations
@@ -38,6 +40,7 @@ export default function ChatScreen() {
         title="Chat HSE"
         colors={GradientHeaders.chat as [string, string]}
         rightIcon="bell"
+        rightBadge={unreadNotifCount}
         onRight={() => navigation.navigate('Notifikasi')}
         subtitle={
           <View style={styles.headerSearch}>

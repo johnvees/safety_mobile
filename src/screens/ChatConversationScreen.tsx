@@ -6,11 +6,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
+  Keyboard,
   Modal,
   Image,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +33,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Rt = RouteProp<RootStackParamList, 'ChatConversation'>;
 
 const RECORD_BAR_COUNT = 32;
+const KEYBOARD_GAP = 10;
 
 export default function ChatConversationScreen() {
   const navigation = useNavigation<Nav>();
@@ -57,10 +58,25 @@ export default function ChatConversationScreen() {
   const [pulseId, setPulseId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const messagePositions = useRef<Record<string, number>>({});
+  const isNearBottom = useRef(true);
+  const prevMessageCount = useRef(0);
+  const prevLastId = useRef<string | undefined>(undefined);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const recorderState = useAudioRecorderState(recorder, 100);
   const blocked = !!conversation?.blocked;
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKeyboardHeight(e.endCoordinates.height + KEYBOARD_GAP));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!isRecording || recorderState.metering === undefined) return;
@@ -83,6 +99,18 @@ export default function ChatConversationScreen() {
       if (recordTimer.current) clearInterval(recordTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    const isNewMessage = messages.length > prevMessageCount.current && last?.id !== prevLastId.current;
+    const isFirstLoad = prevMessageCount.current === 0 && messages.length > 0;
+    prevMessageCount.current = messages.length;
+    prevLastId.current = last?.id;
+
+    if (isNewMessage && (isFirstLoad || last?.isMe || isNearBottom.current)) {
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: !isFirstLoad }));
+    }
+  }, [messages]);
 
   function send() {
     const text = draft.trim();
@@ -237,11 +265,7 @@ export default function ChatConversationScreen() {
   const showMic = !draft.trim() && pendingAttachments.length === 0 && !editingId;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
-    >
+    <View style={[styles.container, { paddingBottom: keyboardHeight }]}>
       <LinearGradient
         colors={GradientHeaders.chat as [string, string]}
         start={{ x: 0, y: 0 }}
@@ -288,6 +312,13 @@ export default function ChatConversationScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onScroll={(e) => {
+          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+          const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+          isNearBottom.current = distanceFromBottom < 120;
+        }}
+        scrollEventThrottle={100}
       >
         {messages.length === 0 ? (
           <View style={styles.empty}>
@@ -526,7 +557,7 @@ export default function ChatConversationScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

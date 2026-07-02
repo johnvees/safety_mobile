@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, StyleSheet, PanResponder } from 'react-native';
 
 interface Props {
   levels: number[]; // 0-1 heights, left to right
@@ -7,25 +7,80 @@ interface Props {
   activeColor: string;
   mutedColor: string;
   height?: number;
+  onSeek?: (progress: number) => void; // 0-1, fired on tap/drag
 }
 
-export default function WaveformBars({ levels, progress = 1, activeColor, mutedColor, height = 24 }: Props) {
+const MIN_BAR_WIDTH = 1.2;
+const MAX_BAR_WIDTH = 2.5;
+
+export default function WaveformBars({
+  levels,
+  progress = 1,
+  activeColor,
+  mutedColor,
+  height = 24,
+  onSeek,
+}: Props) {
+  const containerRef = useRef<View>(null);
+  const [rowWidth, setRowWidth] = useState(0);
+  const pageXRef = useRef(0);
+  const widthRef = useRef(0);
   const activeCount = Math.round(progress * levels.length);
+  const barWidth = rowWidth > 0
+    ? Math.max(MIN_BAR_WIDTH, Math.min(MAX_BAR_WIDTH, (rowWidth / levels.length) * 0.55))
+    : MAX_BAR_WIDTH;
+
+  function measureContainer() {
+    containerRef.current?.measure((_x, _y, w, _h, pageX) => {
+      pageXRef.current = pageX;
+      widthRef.current = w;
+    });
+  }
+
+  function seekFromPageX(pageX: number) {
+    if (!onSeek || widthRef.current <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (pageX - pageXRef.current) / widthRef.current));
+    onSeek(ratio);
+  }
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !!onSeek,
+      onMoveShouldSetPanResponder: () => !!onSeek,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => seekFromPageX(e.nativeEvent.pageX),
+      onPanResponderMove: (_e, g) => seekFromPageX(g.moveX),
+    }),
+  ).current;
 
   return (
-    <View style={[styles.row, { height }]}>
-      {levels.map((lvl, i) => (
-        <View
-          key={i}
-          style={[
-            styles.bar,
-            {
-              height: Math.max(3, lvl * height),
-              backgroundColor: i < activeCount ? activeColor : mutedColor,
-            },
-          ]}
-        />
-      ))}
+    <View
+      ref={containerRef}
+      style={styles.touchArea}
+      onLayout={(e) => {
+        widthRef.current = e.nativeEvent.layout.width;
+        setRowWidth(e.nativeEvent.layout.width);
+        measureContainer();
+      }}
+      hitSlop={{ top: 14, bottom: 14, left: 6, right: 6 }}
+      {...panResponder.panHandlers}
+    >
+      <View style={[styles.row, { height }]} pointerEvents="none">
+        {levels.map((lvl, i) => (
+          <View
+            key={i}
+            style={[
+              styles.bar,
+              {
+                width: barWidth,
+                borderRadius: barWidth / 2,
+                height: Math.max(3, lvl * height),
+                backgroundColor: i < activeCount ? activeColor : mutedColor,
+              },
+            ]}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -44,6 +99,7 @@ export function generateLevels(seedKey: string, count: number): number[] {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 2.5 },
-  bar: { width: 2.5, borderRadius: 1.5 },
+  touchArea: { width: '100%', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  bar: { alignSelf: 'center' },
 });
