@@ -16,10 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
+import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import Icon from '@/components/Icon';
 import ChatBubble from '@/components/ChatBubble';
+import WaveformBars from '@/components/WaveformBars';
 import { C, GradientHeaders } from '@/theme/colors';
 import { F } from '@/theme/typography';
 import { ChatMessage, ChatAttachment, ChatReplyRef, getProfile, formatDateSeparator } from '@/data/chatData';
@@ -30,6 +31,8 @@ import { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Rt = RouteProp<RootStackParamList, 'ChatConversation'>;
+
+const RECORD_BAR_COUNT = 32;
 
 export default function ChatConversationScreen() {
   const navigation = useNavigation<Nav>();
@@ -49,13 +52,22 @@ export default function ChatConversationScreen() {
   const [replyingTo, setReplyingTo] = useState<ChatReplyRef | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [recordLevels, setRecordLevels] = useState<number[]>(Array(RECORD_BAR_COUNT).fill(0.15));
   const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pulseId, setPulseId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const messagePositions = useRef<Record<string, number>>({});
 
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const recorderState = useAudioRecorderState(recorder, 100);
   const blocked = !!conversation?.blocked;
+
+  useEffect(() => {
+    if (!isRecording || recorderState.metering === undefined) return;
+    // metering is dBFS (~-160 silence to 0 loud) — normalize to a 0-1 bar height
+    const normalized = Math.min(1, Math.max(0.08, (recorderState.metering + 60) / 60));
+    setRecordLevels((prev) => [...prev.slice(1), normalized]);
+  }, [recorderState.metering, isRecording]);
 
   function jumpToMessage(id: string) {
     const y = messagePositions.current[id];
@@ -192,6 +204,7 @@ export default function ChatConversationScreen() {
     recorder.record();
     setIsRecording(true);
     setRecordSeconds(0);
+    setRecordLevels(Array(RECORD_BAR_COUNT).fill(0.15));
     recordTimer.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
   }
 
@@ -379,8 +392,17 @@ export default function ChatConversationScreen() {
           {isRecording ? (
             <View style={styles.recordingRow}>
               <View style={styles.recordingDot} />
+              <View style={styles.recordingWaveform}>
+                <WaveformBars
+                  levels={recordLevels}
+                  progress={1}
+                  activeColor={C.danger}
+                  mutedColor={C.line}
+                  height={20}
+                />
+              </View>
               <Text style={styles.recordingText}>
-                Merekam... {Math.floor(recordSeconds / 60)}:{(recordSeconds % 60).toString().padStart(2, '0')}
+                {Math.floor(recordSeconds / 60)}:{(recordSeconds % 60).toString().padStart(2, '0')}
               </Text>
             </View>
           ) : (
@@ -649,7 +671,8 @@ const styles = StyleSheet.create({
     height: 40,
   },
   recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.danger },
-  recordingText: { fontSize: 13, fontFamily: F.medium, color: C.ink },
+  recordingWaveform: { flex: 1, overflow: 'hidden' },
+  recordingText: { fontSize: 13, fontFamily: F.medium, color: C.ink, flexShrink: 0 },
   sendBtn: {
     width: 40,
     height: 40,

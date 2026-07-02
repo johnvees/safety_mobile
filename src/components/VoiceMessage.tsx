@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import Icon from '@/components/Icon';
 import { C } from '@/theme/colors';
 import { F } from '@/theme/typography';
+import WaveformBars, { generateLevels } from '@/components/WaveformBars';
+
+const BAR_COUNT = 28;
 
 interface Props {
   uri: string;
@@ -21,6 +24,7 @@ function formatSeconds(totalSeconds: number): string {
 export default function VoiceMessage({ uri, duration = 0, isMe }: Props) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
+  const levels = useMemo(() => generateLevels(uri, BAR_COUNT), [uri]);
 
   const totalSeconds = status.duration || duration;
   const currentSeconds = status.currentTime || 0;
@@ -46,9 +50,7 @@ export default function VoiceMessage({ uri, duration = 0, isMe }: Props) {
         <Icon name={status.playing ? 'pause-circle' : 'play-circle'} size={22} color={accent} />
       </View>
       <View style={styles.body}>
-        <View style={[styles.track, { backgroundColor: track }]}>
-          <View style={[styles.trackFill, { width: `${progress * 100}%`, backgroundColor: accent }]} />
-        </View>
+        <WaveformBars levels={levels} progress={progress} activeColor={accent} mutedColor={track} height={22} />
         <Text style={[styles.time, { color: isMe ? 'rgba(255,255,255,0.85)' : C.mut }]}>
           {formatSeconds(status.playing || currentSeconds > 0 ? currentSeconds : totalSeconds)}
         </Text>
@@ -61,7 +63,5 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, paddingVertical: 2 },
   playBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, gap: 4 },
-  track: { height: 4, borderRadius: 2, overflow: 'hidden' },
-  trackFill: { height: 4, borderRadius: 2 },
   time: { fontSize: 10.5, fontFamily: F.medium },
 });
